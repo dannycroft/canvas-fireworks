@@ -7,29 +7,31 @@ $(function(){
 	
 	function goCanvas(){
 	
-		var chosen_image = $("#image_src :selected").val() + ".png";
+		var chosen_image = "img\/" + $("#image_src :selected").val() + ".png";
 		var chosen_gravity = $("#gravity :selected").val();
-	
+		var drag = 0.99;
+		var gravity = 0.5;
+		
 		switch(chosen_gravity) {
 		
 			case "0":
-				var drag = 1; 
-				var gravity = 0.01;
+				drag = 1; 
+				gravity = 0.01;
 			break;
 		
 			case "1":
-				var drag = .99;
-				var gravity =.5;
+				drag = 0.99;
+				gravity = 0.5;
 			break;
 		
 			case "2":
-				var drag = .99;
-				var gravity = 1;
+				drag = 0.99;
+				gravity = 1;
 			break;
 		
 			case "3":
-				var drag = .99;
-				var gravity = 1.5;
+				drag = 0.99;
+				gravity = 1.5;
 			break;
 	
 		}
@@ -75,7 +77,6 @@ $(function(){
 		        this.x *= s;
 		        this.y *= s;
 		        this.z *= s;
-
 		    }
 
 		}
@@ -101,8 +102,7 @@ $(function(){
 		            this.vel.y += gravity;
 		        }
 		    }
-
-
+		
 		}
 
 		function setup() {
