@@ -37,6 +37,7 @@ $(function(){
 		var lastMouseX = 0;
 
 		function Vector3(x, y, z) {
+
 		    this.x = x;
 		    this.y = y;
 		    this.z = z;
@@ -53,16 +54,15 @@ $(function(){
 		        cosRY = Math.cos(angle);
 		        sinRY = Math.sin(angle);
 
-
 		        this.x = (this.tx * cosRY) + (this.tz * sinRY);
 		        this.z = (this.tx * -sinRY) + (this.tz * cosRY);
 
 		    }
+
 		    this.reset = function(x, y, z) {
 		        this.x = x;
 		        this.y = y;
 		        this.z = z;
-
 		    }
 
 		    this.plusEq = function(v) {
@@ -75,7 +75,6 @@ $(function(){
 		        this.x *= s;
 		        this.y *= s;
 		        this.z *= s;
-
 
 		    }
 
@@ -92,6 +91,7 @@ $(function(){
 		        this.vel.reset((Math.random() * 20) - 10, Math.random() * -5, (Math.random() * 20) - 10);
 		        this.enabled = true;
 		    }
+
 		    this.reset();
 		    this.update = function() {
 		        if (this.enabled) {
@@ -106,7 +106,6 @@ $(function(){
 		}
 
 		function setup() {
-
 
 		    var fov = 250;
 
@@ -124,10 +123,7 @@ $(function(){
 		    var isMouseDown = false;
 
 		    var img = new Image();
-			//img.src = 'star.png';
-			//img.src = 'electric.png';
-			img.src = 'spark.png';
-			img.src = chosen_image;
+		    img.src = chosen_image;
 	
 		    function draw3Din2D(particle) {
 		        x3d = particle.pos.x;
@@ -150,10 +146,11 @@ $(function(){
 		        isMouseDown = true;
 		        lastMouseX = mouseX;
 		    }
+
 		    document.onmouseup = function(a) {
 		        isMouseDown = false;
-
 		    }
+
 		    document.onmousemove = updateMouse;
 
 		    var particles = [];
@@ -167,14 +164,14 @@ $(function(){
 		                if (spareParticles.length == 0) {
 		                    particle = new Particle();
 		                    particles.push(particle);
-		                }
-		                else {
+		               } else {
 		                    particle = spareParticles.shift();
 		                    particle.reset();
 		                }
 
 		            }
 		        }
+
 		        c.fillStyle = "rgba(0,0,0,0.3)";
 		        c.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
@@ -189,8 +186,7 @@ $(function(){
 		                    particle.enabled = false;
 		                    spareParticles.push(particle);
 		                }
-		            }
-		            else {
+		            } else {
 		                particle.pos.rotateY((lastMouseX - mouseX) * 0.01);
 		                particle.vel.rotateY((lastMouseX - mouseX) * 0.01);
 
@@ -211,7 +207,6 @@ $(function(){
 		        mouseX = e.pageX - canvas.offsetLeft - HALF_WIDTH;
 		        mouseY = e.pageY - canvas.offsetTop - HALF_HEIGHT;;
 		    }
-
 
 		    var loop = setInterval(function() {
 		        render();
