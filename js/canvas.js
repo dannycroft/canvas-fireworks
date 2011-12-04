@@ -32,11 +32,11 @@
 			ring      : "img/electric.png"
 		},
 		spriteColors : {
-			rocket    : [blue],
+			rocket    : [blue, white, moss],
 			explosion : [yellow, white],
-			core      : [orange, yellow, white],
-			shell     : [green, red, orange, tan, green, white],
-			ring      : [moss, sky],
+			core      : [orange, yellow, blue, white, moss],
+			shell     : [green, red, orange, tan, green, white, white, white, sky, blue],
+			ring      : [red, orange, white],
 		},
 		fov : 400,
 		imgs : {}, // loaded sprites
@@ -57,13 +57,11 @@
 				fireworks.initCanvas(this);
 			});
 		},
-
 		start : function() {
 			return this.each(function(){
 				$(this).data("fireworks").start();
 			});
 		},
-
 		stop : function() {
 			return this.each(function(){
 				$(this).data("fireworks").stop();
@@ -104,18 +102,14 @@
 	 * @returns {Array} The RGB values  EG: [r,g,b], [255,255,255]
 	 */
 	function hsvToRgb(h,s,v) {
-
 		var s = s / 100,
 		v = v / 100;
-
 		var hi = Math.floor((h/60) % 6);
 		var f = (h / 60) - hi;
 		var p = v * (1 - s);
 		var q = v * (1 - f * s);
 		var t = v * (1 - (1 - f) * s);
-
 		var rgb = [];
-
 		switch (hi) {
 		case 0: rgb = [v,t,p];break;
 		case 1: rgb = [q,v,p];break;
@@ -124,13 +118,10 @@
 		case 4: rgb = [t,p,v];break;
 		case 5: rgb = [v,p,q];break;
 		}
-
 		var r = Math.min(255, Math.round(rgb[0]*256)),
 		g = Math.min(255, Math.round(rgb[1]*256)),
 		b = Math.min(255, Math.round(rgb[2]*256));
-
 		return [r,g,b];
-
 	}	
 
 	/**
@@ -142,19 +133,15 @@
 	 * @returns {Array} The HSV values EG: [h,s,v], [0-360 degrees, 0-100%, 0-100%]
 	 */
 	function rgbToHsv(r, g, b) {
-
 		var r = (r / 255),
 		g = (g / 255),
   		b = (b / 255);	
-
 		var min = Math.min(Math.min(r, g), b),
 		max = Math.max(Math.max(r, g), b),
 		delta = max - min;
-
 		var value = max,
 		saturation,
 		hue;
-
 		// Hue
 		if (max == min) {
 			hue = 0;
@@ -165,18 +152,15 @@
 		} else if (max == b) {
 			hue = 60 * ((r-g) / (max-min)) + 240;
 		}
-
 		if (hue < 0) {
 			hue += 360;
 		}
-
 		// Saturation
 		if (max == 0) {
 			saturation = 0;
 		} else {
 			saturation = 1 - (min/max);
 		}
-
 		return [Math.round(hue), Math.round(saturation * 100), Math.round(value * 100)];
 	}
 
@@ -223,26 +207,26 @@
 		for ( var color = 0; color < colors.length; ++color ) {
 			var colorHsv = hexToHsv(colors[color]);
 			for ( p = 0; p < pix; ++p ) {
-				var rgb = hsvToRgb(colorHsv[0], colorHsv[1] * pixHsv[p][1] / 100, pixHsv[p][2]);
+				var rgb = hsvToRgb(colorHsv[0], colorHsv[1] * pixHsv[p][1] / 100, colorHsv[2] * pixHsv[p][2] / 100);
 				i = p * 4;
 				imageData.data[i] = rgb[0];
 				imageData.data[i+1] = rgb[1];
 				imageData.data[i+2] = rgb[2];
 			}
-			canvas = this.imgs[name][color] = document.createElement('canvas');
+			canvas = document.createElement('canvas');
 			canvas.width = img.width;
 			canvas.height = img.height;
 			c = canvas.getContext('2d');
 			c.putImageData(imageData, 0, 0);
 			this.imgs[name].push(canvas);
 			for ( p = 0; p < pix; ++p ) {
-				var rgb = hsvToRgb(colorHsv[0], (200 + colorHsv[1] * pixHsv[p][1] / 100) / 3, (200 + pixHsv[p][2]) / 3);
+				var rgb = hsvToRgb(colorHsv[0], colorHsv[1] * pixHsv[p][1] / 100, (200 + colorHsv[2] * pixHsv[p][2] / 100) / 3);
 				i = p * 4;
 				imageData.data[i] = rgb[0];
 				imageData.data[i+1] = rgb[1];
 				imageData.data[i+2] = rgb[2];
 			}
-			canvas = this.imgs[name][color] = document.createElement('canvas');
+			canvas = document.createElement('canvas');
 			canvas.width = img.width;
 			canvas.height = img.height;
 			c = canvas.getContext('2d');
@@ -253,6 +237,7 @@
 
 	Fireworks.prototype.launchRocket = function(idx) {
 		opts={
+			scale: Math.round(Math.random() * 3) / 6,
 			pos: new Vector3((Math.random() * 100) - 50, 190, 0),
 			vel: new Vector3((Math.random() * 10) - 5, (Math.random() * 5) - 20, (Math.random() * 6) - 3),
 			img: this.imgs.rocket.random(),
@@ -286,10 +271,11 @@
 		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; }
 		var imgs = [];
 		imgs[0] = this.imgs.shell.random();
-		imgs[1] = this.imgs.shell.random();
+		if ( Math.random() > 0.8 )
+			imgs[1] = this.imgs.shell.random();
 		// Spawn a symmetrical pair of particles for each unit magnitude
-		for ( var i = 0; i < mag; ++i ) {
-			vel.rotate(Math.random(), Math.random(), Math.random());
+		for ( var i = 0; i < mag * 3; ++i ) {
+			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( (Math.random() + 19) / 20);
 			this.getParticle({
 				pos: pos.copy(),
@@ -321,8 +307,8 @@
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
 		var img = this.imgs.ring.random();
-		for ( var i = 0; i < mag; ++i ) {
-			vel.rotateY(Math.random());
+		for ( var i = 0; i < mag * 2; ++i ) {
+			vel.rotateY(Math.random() * 3);
 			var myVel = vel.copy().rotateX(rX).rotateZ(rZ).multiplyEq( 1.5 + Math.random() / 5 );
 			this.getParticle({
 				pos: pos.copy(),
@@ -331,7 +317,7 @@
 				drag: 0.92,
 				cont: cont,
 				img: img,
-				scale: 0.7,
+				scale: 0.5,
 				timer: 20,
 			});
 			this.getParticle({
@@ -341,7 +327,7 @@
 				drag: 0.92,
 				cont: cont,
 				img: img,
-				scale: 0.7,
+				scale: 0.5,
 				timer: 20,
 			});
 		}
@@ -354,7 +340,7 @@
 		var vel = new Vector3(root, root, root);
 		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; }
 		for ( var i = 0; i < mag / 2; ++i ) {
-			vel.rotate(Math.random(), Math.random(), Math.random());
+			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( Math.random() / 2 + .25);
 			this.getParticle({
 				pos: pos.copy(),
