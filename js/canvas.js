@@ -198,16 +198,18 @@
 		c.drawImage(img, 0, 0);
 		var imageData = c.getImageData(0, 0, img.width, img.height);
 		var pix = imageData.data.length / 4;
-		var pixHsv = [];
+		var pixHsv = [], sat = 0;
 		for ( var p = 0; p < pix; ++p ) {
 			var i = p * 4;
 			pixHsv[p] = rgbToHsv(imageData.data[i], imageData.data[i+1], imageData.data[i+2]);
+			if ( pixHsv[p][1] > sat )
+				sat = pixHsv[p][1];
 		}
 		var colors = this.spriteColors[name];
 		for ( var color = 0; color < colors.length; ++color ) {
 			var colorHsv = hexToHsv(colors[color]);
 			for ( p = 0; p < pix; ++p ) {
-				var rgb = hsvToRgb(colorHsv[0], colorHsv[1] * pixHsv[p][1] / 100, colorHsv[2] * pixHsv[p][2] / 100);
+				var rgb = hsvToRgb(colorHsv[0], colorHsv[1] * pixHsv[p][1] / sat, colorHsv[2] * pixHsv[p][2] / 100);
 				i = p * 4;
 				imageData.data[i] = rgb[0];
 				imageData.data[i+1] = rgb[1];
@@ -220,7 +222,7 @@
 			c.putImageData(imageData, 0, 0);
 			this.imgs[name].push(canvas);
 			for ( p = 0; p < pix; ++p ) {
-				var rgb = hsvToRgb(colorHsv[0], colorHsv[1] * pixHsv[p][1] / 100, (200 + colorHsv[2] * pixHsv[p][2] / 100) / 3);
+				var rgb = hsvToRgb(colorHsv[0], colorHsv[1] * pixHsv[p][1] / sat, (200 + colorHsv[2] * pixHsv[p][2] / 100) / 3);
 				i = p * 4;
 				imageData.data[i] = rgb[0];
 				imageData.data[i+1] = rgb[1];
