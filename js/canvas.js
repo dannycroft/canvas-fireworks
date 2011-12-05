@@ -20,7 +20,7 @@
 
 	var defaults = {
 		renderInterval : 50, // ms between rendered frames
-		stepInterval : 10, // ticks between timeline steps
+		stepInterval : 20, // ticks between timeline steps
 		drag : 0.01, // velocity lost per frame
 		gravity : 0.5, // downward acceleration
 		wind : -0.2, // horizontal slide applied to everything each frame
@@ -406,8 +406,10 @@
 		}
 		++this.tick;
 		// Fade the previous frame
+		this.context.globalCompositeOperation = "source-over";
 		this.context.fillStyle = "rgba(0,0,0,0.3)";
 		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+		this.context.globalCompositeOperation = "lighter";
 		// Draw from farthest to nearest
 		this.particles.sort(this.compareZPos);
 		var particle;
