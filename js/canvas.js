@@ -45,7 +45,7 @@
 		spareParticles : [], // particles ready to be reused
 		tick : 0, // one per rendered frame
 		step : 0, // one per timeline event
-		timer : null,
+		timer : null, // from setInterval
 	};
 
 	var methods = {
@@ -77,6 +77,12 @@
 	Fireworks.prototype.initCanvas = function(canvas) {
 		this.canvas = canvas;
 		this.context = this.canvas.getContext("2d");
+		var self = this;
+		$(canvas).bind('mousedown.fireworks', function() {self.isMouseDown = true;});
+		$(window).bind('mousemove.fireworks', function(e) {self.mouseX = e.pageX - self.canvas.offsetLeft - self.canvas.width / 2;});
+		$(window).bind('mouseup.fireworks', function() {self.isMouseDown = false;});
+		this.lastMouseX = 0;
+		this.mouseX = 0;
 		return this;
 	};
 
@@ -399,25 +405,33 @@
 		if ( this.loading > 0 )
 			return;
 		var i;
-		if ( this.tick % this.stepInterval == 0 ) {
-			for ( i = 0; i < this.timeline[this.step].length; ++i )
-				this.launchRocket(i);
-			this.step = ++this.step % this.timeline.length; // loop
+		if ( !this.isMouseDown ) {
+			if ( this.tick % this.stepInterval == 0 ) {
+				for ( var i = 0; i < this.timeline[this.step].length; ++i )
+					this.launchRocket(i);
+				this.step = ++this.step % this.timeline.length; // loop
+			}
+			++this.tick;
+			for (i = 0; i < this.particles.length; i++)
+				this.particles[i].update();
+			this.context.fillStyle = "rgba(0,0,0,0.3)";
+		} else {
+			for (i = 0; i < this.particles.length; i++) {
+				this.particles[i].pos.rotateY((this.lastMouseX - this.mouseX) * 0.01);
+				this.particles[i].vel.rotateY((this.lastMouseX - this.mouseX) * 0.01);
+			}
+			this.context.fillStyle = "rgba(0,0,0,0.5)";
 		}
-		++this.tick;
 		// Fade the previous frame
 		this.context.globalCompositeOperation = "source-over";
-		this.context.fillStyle = "rgba(0,0,0,0.3)";
 		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		this.context.globalCompositeOperation = "lighter";
+		this.lastMouseX = this.mouseX;
 		// Draw from farthest to nearest
 		this.particles.sort(this.compareZPos);
-		var particle;
 		for (i = 0; i < this.particles.length; i++) {
-			particle = this.particles[i];
-			particle.update();
-			if ( particle.enabled )
-				this.draw3Din2D(particle, i);
+			if ( this.particles[i].enabled )
+				this.draw3Din2D(this.particles[i], i);
 		}
 	};
 
