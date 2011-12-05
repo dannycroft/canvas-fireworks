@@ -356,7 +356,8 @@
 				grav: 0.2,
 				drag: 0.93,
 				cont: cont,
-				img: this.imgs.core,
+				img: this.imgs.core[0],
+				imgs: this.imgs.core,
 				scale: 0.6,
 				timer: 20,
 			});
@@ -366,7 +367,8 @@
 				grav: 0.2,
 				drag: 0.93,
 				cont: cont,
-				img: this.imgs.core,
+				img: this.imgs.core[0],
+				imgs: this.imgs.core,
 				scale: 0.6,
 				timer: 20,
 			});
@@ -386,19 +388,13 @@
 		return particle;
 	};
 
-	Fireworks.prototype.draw3Din2D = function(particle, idx) {
+	Fireworks.prototype.draw3Din2D = function(particle) {
 		var scale = this.fov / ( this.fov + particle.pos.z );
 		var x2d = ( particle.pos.x * scale) + this.canvas.width / 2;
 		var y2d = ( particle.pos.y * scale) + this.canvas.height / 2;
 		scale *= 6 * particle.scale;
-		if ( typeof idx != "number" )
-			idx = 0;
-		if ( particle.img.length )
-			var img = particle.img[ idx % particle.img.length ];
-		else
-			var img = particle.img;
 		if (scale > 0)
-			this.context.drawImage(img, x2d - scale, y2d - scale, scale * 2, scale * 2);
+			this.context.drawImage(particle.img, x2d - scale, y2d - scale, scale * 2, scale * 2);
 	};
 
 	Fireworks.prototype.render = function() {
@@ -413,7 +409,7 @@
 			}
 			++this.tick;
 			for (i = 0; i < this.particles.length; i++)
-				this.particles[i].update();
+				this.particles[i].update(i);
 			this.context.fillStyle = "rgba(0,0,0,0.3)";
 		} else {
 			for (i = 0; i < this.particles.length; i++) {
@@ -431,7 +427,7 @@
 		this.particles.sort(this.compareZPos);
 		for (i = 0; i < this.particles.length; i++) {
 			if ( this.particles[i].enabled )
-				this.draw3Din2D(this.particles[i], i);
+				this.draw3Din2D(this.particles[i]);
 		}
 	};
 
@@ -517,6 +513,7 @@
 		enabled: true,
 		data: null,
 		scale: 1,
+		imgs: false,
 		cont: function(particle) {
 			return particle.enabled;
 		}
@@ -526,13 +523,15 @@
 		$.extend(this, this.defaults, opts);
 	};
 
-	Particle.prototype.update = function() {
+	Particle.prototype.update = function(i) {
 		if (this.enabled) {
 			if ( this.cont(this) ) {
 				this.pos.plusEq(this.vel);
 				this.vel.multiplyEq((1 - this.fireworks.drag) * this.drag);
 				this.vel.y += this.fireworks.gravity * this.grav;
 				this.pos.x += this.fireworks.wind;
+				if ( typeof this.imgs == 'object' )
+					this.img = this.imgs[ i % this.imgs.length ];
 			} else {
 				this.enabled = false;
 				this.fireworks.spareParticles.push(this);
