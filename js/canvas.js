@@ -29,7 +29,11 @@
 			explosion : "img/spark.png",
 			core      : "img/spark.png",
 			shell     : "img/star.png",
-			ring      : "img/electric.png"
+			ring      : "img/electric.png",
+			logo      : "img/star.png",
+		},
+		rasters : { // pixel maps to generate 2D fireworks arrays
+			logo      : "img/w.png"
 		},
 		spriteColors : {
 			rocket    : [blue, white, moss],
@@ -37,6 +41,7 @@
 			core      : [orange, yellow, blue, white, moss],
 			shell     : [green, red, orange, tan, green, white, white, white, sky, blue],
 			ring      : [red, orange, white],
+			logo      : [blue, green, orange, sky],
 		},
 		fov : 400,
 		imgs : {}, // loaded sprites
@@ -195,6 +200,14 @@
 				--self.loading;
 			};
 		});
+		$.each(this.rasters, function(name, url) {
+			++self.loading;
+			self.rasters[name] = new Image();
+			self.rasters[name].src = url;
+			self.rasters[name].onload = function() {
+				--self.loading;
+			};
+		});
 	};
 
 	Fireworks.prototype.varySprite = function(name, img) {
@@ -256,7 +269,10 @@
 					return true;
 				// Spawn explosion particles
 				particle.fireworks.explodeCore(particle.pos, particle.data[0]);
-				particle.fireworks.explodeShell(particle.pos, particle.data[1]);
+				if ( Math.random() < .9 )
+					particle.fireworks.explodeShell(particle.pos, particle.data[1]);
+				else
+					particle.fireworks.explodeRaster('logo', particle.pos, particle.data[0]);
 				particle.fireworks.explodeRing(particle.pos, particle.data[2]);
 				// Become bright, expand, contract, fade away
 				particle.img = particle.fireworks.imgs.explosion.random();
@@ -372,6 +388,41 @@
 				scale: 0.6,
 				timer: 20,
 			});
+		}
+	};
+
+	Fireworks.prototype.explodeRaster = function(name, pos, mag) {
+		if ( mag <= 0 )
+			return;
+		var root = Math.sqrt(mag);
+		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; };
+		// convert raster into array of particles
+		var canvas = document.createElement("canvas");
+		var c = canvas.getContext("2d");
+		var raster = this.rasters[name];
+		c.drawImage(raster, 0, 0, raster.width, raster.height);
+		var imageData = id = c.getImageData(0, 0, raster.width, raster.height);
+		var i = 0, halfx = raster.width / 2, halfy = raster.height / 2, x, y, vx, vy;
+		var rx = Math.random() - 0.5, ry = Math.random() - 0.5, rz = Math.random() - 0.5;
+		var img = this.imgs[name].random();
+		for ( var row = 0; row < raster.height; ++row ) {
+			y = row - halfy;
+			for ( var col = 0; col < raster.width; ++col ) {
+				if ( imageData.data[i+3] > 127 ) {
+					x = col - halfx;
+					this.getParticle({
+						pos: new Vector3(pos.x + x / 10, pos.y + y / 10, pos.z),
+						vel: (new Vector3(x, y, 0)).multiplyEq(root / 10 + Math.random() / 10).rotate(rx, ry, rz),
+						grav: .4,
+						drag: .9,
+						cont: cont,
+						img: img,
+						scale: 1,
+						timer: 20,
+					});
+				}
+				i += 4;
+			}
 		}
 	};
 
