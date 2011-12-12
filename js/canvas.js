@@ -51,6 +51,9 @@
 		tick : 0, // one per rendered frame
 		step : 0, // one per timeline event
 		timer : null, // from setInterval
+		stopped : false,
+		targetParticleDensity : 1.5,
+		particleDensity : 1
 	};
 
 	var methods = {
@@ -81,6 +84,8 @@
 
 	Fireworks.prototype.initCanvas = function(canvas) {
 		this.canvas = canvas;
+		this.canvas.width = this.canvas.clientWidth;
+		this.canvas.height = this.canvas.clientHeight;
 		this.context = this.canvas.getContext("2d");
 		var self = this;
 		$(canvas).bind('mousedown.fireworks', function() {self.isMouseDown = true;});
@@ -92,15 +97,18 @@
 	};
 
 	Fireworks.prototype.start = function() {
+		this.stopped = false;
+		this.lastRenderTime = 1;
 		var self = this;
-		this.timer = setInterval(function() {
+		this.timer = setTimeout(function() {
 			self.render();
 		}, this.renderInterval);
 		return this;
 	};
 
 	Fireworks.prototype.stop = function() {
-		clearInterval(this.timer);
+		this.stopped = true;
+		clearTimeout(this.timer);
 		return this;
 	};
 
@@ -260,16 +268,17 @@
 		opts={
 			scale: Math.round(Math.random() * 3) / 6,
 			pos: new Vector3((Math.random() * 100) - 50, 190, 0),
-			vel: new Vector3((Math.random() * 10) - 5, (Math.random() * 5) - 20, (Math.random() * 6) - 3),
+			vel: new Vector3((Math.random() * 12) - 6, (Math.random() * 5) - 20, (Math.random() * 6) - 3),
 			img: this.imgs.rocket.random(),
 			data: this.timeline[ this.step ][ idx ],
+			expendable: false,
 			cont: function(particle) {
 				// Continue while rising
 				if ( particle.vel.y < 0 )
 					return true;
 				// Spawn explosion particles
 				particle.fireworks.explodeCore(particle.pos, particle.data[0]);
-				if ( Math.random() < .9 )
+				if ( Math.random() < .92 )
 					particle.fireworks.explodeShell(particle.pos, particle.data[1]);
 				else
 					particle.fireworks.explodeRaster('logo', particle.pos, particle.data[0]);
@@ -298,7 +307,8 @@
 		if ( Math.random() > 0.8 )
 			imgs[1] = this.imgs.shell.random();
 		// Spawn a symmetrical pair of particles for each unit magnitude
-		for ( var i = 0; i < mag * 3; ++i ) {
+		var numP = this.scaleParticleCount(mag * 3);
+		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( (Math.random() + 19) / 20);
 			this.getParticle({
@@ -331,7 +341,8 @@
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
 		var img = this.imgs.ring.random();
-		for ( var i = 0; i < mag * 2; ++i ) {
+		var numP = this.scaleParticleCount(mag * 2);
+		for ( var i = 0; i < numP; ++i ) {
 			vel.rotateY(Math.random() * 3);
 			var myVel = vel.copy().rotateX(rX).rotateZ(rZ).multiplyEq( 1.5 + Math.random() / 5 );
 			this.getParticle({
@@ -363,7 +374,8 @@
 		var root = Math.sqrt(mag) / 3;
 		var vel = new Vector3(root, root, root);
 		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; }
-		for ( var i = 0; i < mag / 2; ++i ) {
+		var numP = this.scaleParticleCount(10 + mag / 2);
+		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( Math.random() / 2 + .25);
 			this.getParticle({
@@ -405,25 +417,33 @@
 		var i = 0, halfx = raster.width / 2, halfy = raster.height / 2, x, y, vx, vy;
 		var rx = Math.random() - 0.5, ry = Math.random() - 0.5, rz = Math.random() - 0.5;
 		var img = this.imgs[name].random();
+		var pCount = 0;
 		for ( var row = 0; row < raster.height; ++row ) {
 			y = row - halfy;
 			for ( var col = 0; col < raster.width; ++col ) {
 				if ( imageData.data[i+3] > 127 ) {
 					x = col - halfx;
-					this.getParticle({
-						pos: new Vector3(pos.x + x / 10, pos.y + y / 10, pos.z),
-						vel: (new Vector3(x, y, 0)).multiplyEq(root / 10 + Math.random() / 10).rotate(rx, ry, rz),
-						grav: .4,
-						drag: .9,
-						cont: cont,
-						img: img,
-						scale: 1,
-						timer: 20,
-					});
+					if ( Math.floor(pCount + this.particleDensity) > pCount ) {
+						this.getParticle({
+							pos: new Vector3(pos.x + x / 10, pos.y + y / 10, pos.z),
+							vel: (new Vector3(x, y, 0)).multiplyEq(root / 10 + Math.random() / 10).rotate(rx, ry, rz),
+							grav: .4,
+							drag: .9,
+							cont: cont,
+							img: img,
+							scale: 1,
+							timer: 20,
+						});
+					}
+					pCount += this.particleDensity;
 				}
 				i += 4;
 			}
 		}
+	};
+
+	Fireworks.prototype.scaleParticleCount = function(c) {
+		return c * this.particleDensity;
 	};
 
 	Fireworks.prototype.getParticle = function(opts) {
@@ -449,18 +469,37 @@
 	};
 
 	Fireworks.prototype.render = function() {
-		if ( this.loading > 0 )
+		var frameStartTime = (new Date()).getTime();
+		if ( this.stopped )
 			return;
+		if ( this.loading > 0 ) {
+			var self = this;
+			this.timer = setTimeout(function(){self.render();}, 10);
+			return;
+		}
 		var i;
 		if ( !this.isMouseDown ) {
-			if ( this.tick % this.stepInterval == 0 ) {
-				for ( var i = 0; i < this.timeline[this.step].length; ++i )
-					this.launchRocket(i);
-				this.step = ++this.step % this.timeline.length; // loop
+			for ( var frames = Math.floor( this.lastRenderTime / this.renderInterval ) + 1; frames > 0; frames = 0 * Math.floor(frames / 2) ) {
+				if ( frames > 1 ) {
+					for ( i = 0; i < this.particles.length; i++ ) {
+						if ( this.particles[i].enabled ) {
+							this.particles[i].disable();
+							i += 6;
+						}
+					}
+					this.particleDensity *= 0.93;
+				} else {
+					this.particleDensity += (this.targetParticleDensity - this.particleDensity ) / 300;
+				}
+				if ( this.tick % this.stepInterval == 0 ) {
+					for ( var i = 0; i < this.timeline[this.step].length; ++i )
+						this.launchRocket(i);
+					this.step = ++this.step % this.timeline.length; // loop
+				}
+				++this.tick;
+				for (i = 0; i < this.particles.length; i++)
+					this.particles[i].update(i);
 			}
-			++this.tick;
-			for (i = 0; i < this.particles.length; i++)
-				this.particles[i].update(i);
 			this.context.fillStyle = "rgba(0,0,0,0.3)";
 		} else {
 			for (i = 0; i < this.particles.length; i++) {
@@ -480,6 +519,9 @@
 			if ( this.particles[i].enabled )
 				this.draw3Din2D(this.particles[i]);
 		}
+		this.lastRenderTime = (new Date()) - frameStartTime;
+		var self = this;
+		this.timer = setTimeout(function(){self.render();}, Math.max(10, this.renderInterval - this.lastRenderTime));
 	};
 
 	Fireworks.prototype.compareZPos = function(a, b) {
@@ -565,6 +607,7 @@
 		data: null,
 		scale: 1,
 		imgs: false,
+		expendable: true,
 		cont: function(particle) {
 			return particle.enabled;
 		}
@@ -584,9 +627,15 @@
 				if ( typeof this.imgs == 'object' )
 					this.img = this.imgs[ i % this.imgs.length ];
 			} else {
-				this.enabled = false;
-				this.fireworks.spareParticles.push(this);
+				this.disable();
 			}
+		}
+	};
+
+	Particle.prototype.disable = function() {
+		if (this.enabled && this.expendable) {
+			this.enabled = false;
+			this.fireworks.spareParticles.push(this);
 		}
 	};
 
