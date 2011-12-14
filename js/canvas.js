@@ -287,8 +287,8 @@
 				particle.img = particle.fireworks.imgs.explosion.random();
 				particle.vel = new Vector3(0, 0, 0);
 				particle.grav = 0;
-				var x = Math.sqrt(particle.data[0]) / 10;
-				particle.scales = [1,2,4,5,5,5,4,4,4,3,3,2,2,0].map(function(s){return s*x;});
+				var x = Math.max(Math.sqrt(particle.data[0]) / 10, 0.25);
+				particle.scales = [2,4,5,5,4,4,3,3,2,2,0].map(function(s){return s*x;});
 				particle.cont = function(particle) { return particle.scale = particle.scales.shift(); };
 				return true;
 			}
