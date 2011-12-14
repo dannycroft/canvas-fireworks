@@ -267,8 +267,8 @@
 	Fireworks.prototype.launchRocket = function(idx) {
 		opts={
 			scale: Math.round(Math.random() * 3) / 6,
-			pos: new Vector3((Math.random() * 100) - 50, 190, 0),
-			vel: new Vector3((Math.random() * 12) - 6, (Math.random() * 5) - 20, (Math.random() * 6) - 3),
+			pos: new Vector3(Math.random() * 100 - 50, Math.random() * 3 + 190, Math.random() * 4 - 2),
+			vel: new Vector3(Math.random() * 12 - 6, Math.random() * 6 - 20, Math.random() * 6 - 3),
 			img: this.imgs.rocket.random(),
 			data: this.timeline[ this.step ][ idx ],
 			expendable: false,
@@ -374,7 +374,7 @@
 		var root = Math.sqrt(mag) / 3;
 		var vel = new Vector3(root, root, root);
 		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; }
-		var numP = this.scaleParticleCount(10 + mag / 2);
+		var numP = 5 + this.scaleParticleCount(mag / 20);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( Math.random() / 2 + .25);
@@ -477,6 +477,12 @@
 			this.timer = setTimeout(function(){self.render();}, 10);
 			return;
 		}
+
+		if ( typeof this.startCallback == "function" ) {
+			this.startCallback.call();
+			this.startCallback = null;
+		}
+
 		var i;
 		if ( !this.isMouseDown ) {
 			for ( var frames = Math.floor( this.lastRenderTime / this.renderInterval ) + 1; frames > 0; frames = 0 * Math.floor(frames / 2) ) {
