@@ -52,7 +52,8 @@
 		step : 0, // one per timeline event
 		timer : null, // from setInterval
 		stopped : false,
-		targetParticleDensity : 1.5,
+		maxParticleDensity : 1.5,
+		minParticleDensity : 0.5,
 		particleDensity : 1
 	};
 
@@ -266,7 +267,8 @@
 
 	Fireworks.prototype.launchRocket = function(idx) {
 		opts={
-			scale: Math.round(Math.random() * 3) / 6,
+			scale: Math.round(Math.random() * 2) / 8,
+			stretch: true,
 			pos: new Vector3(Math.random() * 100 - 50, Math.random() * 3 + 190, Math.random() * 4 - 2),
 			vel: new Vector3(Math.random() * 12 - 6, Math.random() * 6 - 20, Math.random() * 6 - 3),
 			img: this.imgs.rocket.random(),
@@ -274,20 +276,22 @@
 			expendable: false,
 			cont: function(particle) {
 				// Continue while rising
-				if ( particle.vel.y < 0 )
+				if ( particle.vel.y < -1.5 )
 					return true;
+				this.update(0, true);
 				// Spawn explosion particles
+				particle.stretch = false;
 				particle.fireworks.explodeCore(particle.pos, particle.data[0]);
-				if ( Math.random() < .92 )
-					particle.fireworks.explodeShell(particle.pos, particle.data[1]);
+				if ( Math.random() < .93 )
+					particle.fireworks.explodeShell(particle.pos, particle.data[1], particle);
 				else
 					particle.fireworks.explodeRaster('logo', particle.pos, particle.data[0]);
-				particle.fireworks.explodeRing(particle.pos, particle.data[2]);
+				particle.fireworks.explodeRing(particle.pos, particle.data[2], particle);
 				// Become bright, expand, contract, fade away
 				particle.img = particle.fireworks.imgs.explosion.random();
 				particle.vel = new Vector3(0, 0, 0);
 				particle.grav = 0;
-				var x = Math.max(Math.sqrt(particle.data[0]) / 10, 0.25);
+				var x = Math.max(Math.sqrt(particle.data[0]) / 20, 0.25);
 				particle.scales = [2,4,5,5,4,4,3,3,2,2,0].map(function(s){return s*x;});
 				particle.cont = function(particle) { return particle.scale = particle.scales.shift(); };
 				return true;
@@ -296,48 +300,65 @@
 		this.getParticle(opts);
 	};
 
-	Fireworks.prototype.explodeShell = function(pos, mag) {
+	Fireworks.prototype.explodeShell = function(pos, mag, op) {
 		if ( mag <= 0 )
 			return;
 		var root = Math.sqrt(mag) + 1;
 		var vel = new Vector3(root, root, root);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; }
+		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
+		var scale = 1;
+		var stretched = false;
 		var imgs = [];
-		imgs[0] = this.imgs.shell.random();
-		if ( Math.random() > 0.8 )
-			imgs[1] = this.imgs.shell.random();
+		if ( Math.random() > 0.5 ) {
+			imgs[0] = this.imgs.shell.random();
+			if ( Math.random() > 0.8 )
+				imgs[1] = this.imgs.shell.random();
+			scale = (Math.random() / 2) + 0.75;
+		} else {
+			imgs[0] = this.imgs.ring.random();
+			if ( Math.random() > 0.8 )
+				imgs[1] = this.imgs.shell.random();
+			scale = (Math.random() / 2) + 0.25;
+		}	
 		// Spawn a symmetrical pair of particles for each unit magnitude
 		var numP = this.scaleParticleCount(mag * 3);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( (Math.random() + 19) / 20);
 			this.getParticle({
+				scale: scale,
 				pos: pos.copy(),
 				vel: myVel,
-				grav: 0.4,
-				drag: 0.9,
+				grav: 0.3,
+				drag: 0.91,
 				cont: cont,
 				img: imgs.random(),
-				timer: 20,
+				timer: 23,
+				x: op.x,
+				y: op.y
 			});
 			this.getParticle({
+				scale: scale,
+				stretched: stretched,
 				pos: pos.copy(),
 				vel: myVel.invert(),
-				grav: 0.4,
-				drag: 0.9,
+				grav: 0.3,
+				drag: 0.91,
 				cont: cont,
 				img: imgs.random(),
-				timer: 20,
+				timer: 23,
+				x: op.x,
+				y: op.y
 			});
 		}
 	};
 
-	Fireworks.prototype.explodeRing = function(pos, mag) {
+	Fireworks.prototype.explodeRing = function(pos, mag, op) {
 		if ( mag <= 0 )
 			return;
 		var root = Math.sqrt(mag) + 1;
 		var vel = new Vector3(root, 0, root);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; }
+		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
 		var img = this.imgs.ring.random();
@@ -346,24 +367,30 @@
 			vel.rotateY(Math.random() * 3);
 			var myVel = vel.copy().rotateX(rX).rotateZ(rZ).multiplyEq( 1.5 + Math.random() / 5 );
 			this.getParticle({
+				stretch: true,
 				pos: pos.copy(),
 				vel: myVel,
-				grav: 0.4,
-				drag: 0.92,
+				grav: 0.3,
+				drag: 0.91,
 				cont: cont,
 				img: img,
 				scale: 0.5,
-				timer: 20,
+				timer: 23,
+				x: op.x,
+				y: op.y
 			});
 			this.getParticle({
+				stretch: true,
 				pos: pos.copy(),
 				vel: myVel.invert(),
-				grav: 0.4,
-				drag: 0.92,
+				grav: 0.3,
+				drag: 0.91,
 				cont: cont,
 				img: img,
 				scale: 0.5,
-				timer: 20,
+				timer: 23,
+				x: op.x,
+				y: op.y
 			});
 		}
 	};
@@ -373,7 +400,7 @@
 			return;
 		var root = Math.sqrt(mag) / 3;
 		var vel = new Vector3(root, root, root);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; }
+		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
 		var numP = 5 + this.scaleParticleCount(mag / 20);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
@@ -387,7 +414,7 @@
 				img: this.imgs.core[0],
 				imgs: this.imgs.core,
 				scale: 0.6,
-				timer: 20,
+				timer: 23,
 			});
 			this.getParticle({
 				pos: pos.copy(),
@@ -398,7 +425,7 @@
 				img: this.imgs.core[0],
 				imgs: this.imgs.core,
 				scale: 0.6,
-				timer: 20,
+				timer: 23,
 			});
 		}
 	};
@@ -407,7 +434,7 @@
 		if ( mag <= 0 )
 			return;
 		var root = Math.sqrt(mag);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.3; };
+		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; };
 		// convert raster into array of particles
 		var canvas = document.createElement("canvas");
 		var c = canvas.getContext("2d");
@@ -432,7 +459,7 @@
 							cont: cont,
 							img: img,
 							scale: 1,
-							timer: 20,
+							timer: 23,
 						});
 					}
 					pCount += this.particleDensity;
@@ -460,12 +487,17 @@
 	};
 
 	Fireworks.prototype.draw3Din2D = function(particle) {
-		var scale = this.fov / ( this.fov + particle.pos.z );
-		var x2d = ( particle.pos.x * scale) + this.canvas.width / 2;
-		var y2d = ( particle.pos.y * scale) + this.canvas.height / 2;
-		scale *= 6 * particle.scale;
-		if (scale > 0)
-			this.context.drawImage(particle.img, x2d - scale, y2d - scale, scale * 2, scale * 2);
+		if ( particle.scale > 0 ) {
+			var scale = this.fov / ( this.fov + particle.pos.z );
+			var x2d = ( particle.pos.x * scale) + this.canvas.width / 2;
+			var y2d = ( particle.pos.y * scale) + this.canvas.height / 2;
+			scale *= 6 * particle.scale;
+			this.context.save();
+			this.context.translate( x2d, y2d );
+			particle.transform(this.context, x2d, y2d, !this.isMouseDown);
+			this.context.drawImage(particle.img, 0, 0, scale * 2, scale * 2);
+			this.context.restore();
+		}
 	};
 
 	Fireworks.prototype.render = function() {
@@ -493,9 +525,9 @@
 							i += 6;
 						}
 					}
-					this.particleDensity *= 0.93;
+					this.particleDensity -= (this.particleDensity - this.minParticleDensity) / 50;
 				} else {
-					this.particleDensity += (this.targetParticleDensity - this.particleDensity ) / 300;
+					this.particleDensity += (this.maxParticleDensity - this.particleDensity) / 200;
 				}
 				if ( this.tick % this.stepInterval == 0 ) {
 					for ( var i = 0; i < this.timeline[this.step].length; ++i )
@@ -506,7 +538,7 @@
 				for (i = 0; i < this.particles.length; i++)
 					this.particles[i].update(i);
 			}
-			this.context.fillStyle = "rgba(0,0,0,0.3)";
+			this.context.fillStyle = "rgba(0,0,0,0.25)";
 		} else {
 			for (i = 0; i < this.particles.length; i++) {
 				this.particles[i].pos.rotateY((this.lastMouseX - this.mouseX) * 0.01);
@@ -612,6 +644,9 @@
 		enabled: true,
 		data: null,
 		scale: 1,
+		x: false,
+		y: false,
+		stretch: false,
 		imgs: false,
 		expendable: true,
 		cont: function(particle) {
@@ -623,9 +658,9 @@
 		$.extend(this, this.defaults, opts);
 	};
 
-	Particle.prototype.update = function(i) {
+	Particle.prototype.update = function(i, cont) {
 		if (this.enabled) {
-			if ( this.cont(this) ) {
+			if ( cont || this.cont(this) ) {
 				this.pos.plusEq(this.vel);
 				this.vel.multiplyEq((1 - this.fireworks.drag) * this.drag);
 				this.vel.y += this.fireworks.gravity * this.grav;
@@ -636,6 +671,26 @@
 				this.disable();
 			}
 		}
+	};
+
+	Particle.prototype.transform = function(context, x, y, stretch) {
+		if ( this.x === false ) {
+			this.x = x;
+			this.y = y;
+		}
+		if ( this.stretch && stretch ) {
+			var dx = x - this.x;
+			var dy = y - this.y;
+			var angle = Math.atan2( dy, dx );
+			if ( angle < 0 )
+				angle += Math.PI * 2;
+			var distance = Math.sqrt( Math.pow( dx, 2 ) + Math.pow( dy, 2 ) );
+			context.rotate(angle);
+			context.scale(distance / this.scale / 5, 1);
+		}
+		context.translate(- this.scale * 6, - this.scale * 6);
+		this.x = x;
+		this.y = y;
 	};
 
 	Particle.prototype.disable = function() {
