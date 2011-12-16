@@ -668,7 +668,7 @@
 				if ( typeof this.imgs == 'object' )
 					this.img = this.imgs[ i % this.imgs.length ];
 			} else {
-				this.disable();
+				this.disable(true);
 			}
 		}
 	};
@@ -693,8 +693,8 @@
 		this.y = y;
 	};
 
-	Particle.prototype.disable = function() {
-		if (this.enabled && this.expendable) {
+	Particle.prototype.disable = function(force) {
+		if (this.enabled && ( this.expendable || force ) ) {
 			this.enabled = false;
 			this.fireworks.spareParticles.push(this);
 		}
