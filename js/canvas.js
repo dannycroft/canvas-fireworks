@@ -40,10 +40,10 @@
 			explosion : [yellow, white],
 			core      : [orange, yellow, blue, white, moss],
 			shell     : [green, red, orange, tan, green, white, white, white, sky, blue],
-			ring      : [red, orange, white],
+			ring      : [red, orange, white, sky, tan],
 			logo      : [blue, green, orange, sky],
 		},
-		fov : 400,
+		fov : 500,
 		imgs : {}, // loaded sprites
 		loading : 0,
 		particles : [], // all particles ever created
@@ -282,10 +282,7 @@
 				// Spawn explosion particles
 				particle.stretch = false;
 				particle.fireworks.explodeCore(particle.pos, particle.data[0]);
-				if ( Math.random() < .93 )
-					particle.fireworks.explodeShell(particle.pos, particle.data[1], particle);
-				else
-					particle.fireworks.explodeRaster('logo', particle.pos, particle.data[0]);
+				particle.fireworks.explodeShell(particle.pos, particle.data[1], particle);
 				particle.fireworks.explodeRing(particle.pos, particle.data[2], particle);
 				// Become bright, expand, contract, fade away
 				particle.img = particle.fireworks.imgs.explosion.random();
@@ -307,7 +304,6 @@
 		var vel = new Vector3(root, root, root);
 		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
 		var scale = 1;
-		var stretched = false;
 		var imgs = [];
 		if ( Math.random() > 0.5 ) {
 			imgs[0] = this.imgs.shell.random();
@@ -319,15 +315,16 @@
 			if ( Math.random() > 0.8 )
 				imgs[1] = this.imgs.shell.random();
 			scale = (Math.random() / 2) + 0.25;
-		}	
+		}
 		// Spawn a symmetrical pair of particles for each unit magnitude
 		var numP = this.scaleParticleCount(mag * 3);
+		var myPos = new Vector3(pos.x, pos.y, pos.z);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( (Math.random() + 19) / 20);
 			this.getParticle({
 				scale: scale,
-				pos: pos.copy(),
+				pos: myPos.copy(),
 				vel: myVel,
 				grav: 0.3,
 				drag: 0.91,
@@ -339,8 +336,7 @@
 			});
 			this.getParticle({
 				scale: scale,
-				stretched: stretched,
-				pos: pos.copy(),
+				pos: myPos.copy(),
 				vel: myVel.invert(),
 				grav: 0.3,
 				drag: 0.91,
@@ -356,19 +352,20 @@
 	Fireworks.prototype.explodeRing = function(pos, mag, op) {
 		if ( mag <= 0 )
 			return;
-		var root = Math.sqrt(mag) + 1;
+		var root = Math.sqrt(mag) * 0.8 + 1;
 		var vel = new Vector3(root, 0, root);
 		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
 		var img = this.imgs.ring.random();
 		var numP = this.scaleParticleCount(mag * 2);
+		var myPos = new Vector3(pos.x, pos.y, pos.z);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotateY(Math.random() * 3);
 			var myVel = vel.copy().rotateX(rX).rotateZ(rZ).multiplyEq( 1.5 + Math.random() / 5 );
 			this.getParticle({
 				stretch: true,
-				pos: pos.copy(),
+				pos: myPos.copy(),
 				vel: myVel,
 				grav: 0.3,
 				drag: 0.91,
@@ -381,7 +378,7 @@
 			});
 			this.getParticle({
 				stretch: true,
-				pos: pos.copy(),
+				pos: myPos.copy(),
 				vel: myVel.invert(),
 				grav: 0.3,
 				drag: 0.91,
