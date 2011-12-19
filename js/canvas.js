@@ -19,8 +19,9 @@
 	    white  = "#FFFFFF";
 
 	var defaults = {
-		renderInterval : 50, // ms between rendered frames
+		frameInterval : 50, // ms between rendered frames
 		stepInterval : 20, // ticks between timeline steps
+		frameCacheSize : 20, // number of frame to generate in advance
 		drag : 0.01, // velocity lost per frame
 		gravity : 0.5, // downward acceleration
 		wind : -0.2, // horizontal slide applied to everything each frame
@@ -54,7 +55,10 @@
 		stopped : false,
 		maxParticleDensity : 1.5,
 		minParticleDensity : 0.5,
-		particleDensity : 1
+		particleDensity : 1,
+		frameCache : [],
+		frameCacheIndex : 0,
+		startCallback : null,
 	};
 
 	var methods = {
@@ -84,28 +88,34 @@
 	};
 
 	Fireworks.prototype.initCanvas = function(canvas) {
-		this.canvas = canvas;
-		this.canvas.width = this.canvas.clientWidth;
-		this.canvas.height = this.canvas.clientHeight;
+		// This is the canvas that the user sees.
+		this.displayCanvas = canvas;
+		this.displayCanvas.width = this.displayCanvas.clientWidth;
+		this.displayCanvas.height = this.displayCanvas.clientHeight;
+		this.displayContext = this.displayCanvas.getContext("2d");
+
+		// This is the canvas that we draw frames on.
+		this.canvas = document.createElement("canvas");
+		this.canvas.width = this.displayCanvas.clientWidth;
+		this.canvas.height = this.displayCanvas.clientHeight;
 		this.w2 = this.canvas.width / 2;
 		this.h2 = this.canvas.height / 2;
 		this.context = this.canvas.getContext("2d");
+/*
 		var self = this;
 		$(canvas).bind('mousedown.fireworks', function() {self.isMouseDown = true;});
 		$(window).bind('mousemove.fireworks', function(e) {self.mouseX = e.pageX - self.canvas.offsetLeft - self.w2;});
 		$(window).bind('mouseup.fireworks', function() {self.isMouseDown = false;});
 		this.lastMouseX = 0;
 		this.mouseX = 0;
+*/
 		return this;
 	};
 
 	Fireworks.prototype.start = function() {
 		this.stopped = false;
 		this.lastRenderTime = 1;
-		var self = this;
-		this.timer = setTimeout(function() {
-			self.render();
-		}, this.renderInterval);
+		this.render();
 		return this;
 	};
 
@@ -303,15 +313,15 @@
 			return;
 		var root = Math.sqrt(mag) + 1;
 		var vel = new Vector3(root, root, root);
-		var scale = 0.2;
+		var scale = 0.15 + Math.random() * 0.1;
 		var cont = function(p) { p.stretch = 6; return --p.timer > 0 || Math.random() > 0.25; }
 		var imgs = [];
 		do {
 			imgs.push(this.imgs.shell.random());
 		} while ( Math.random() > 0.7 );
-		// Spawn a symmetrical pair of particles at a time
-		var numP = this.scaleParticleCount(mag * 6);
+		var numP = this.scaleParticleCount(mag * 8);
 		var myPos = new Vector3(pos.x, pos.y, pos.z);
+		// Spawn a symmetrical pair of particles at a time
 		for ( var i = 0; i < numP; i += 2 ) {
 			vel.rotate(Math.random() * 6, Math.random() * 6, Math.random() * 6);
 			var myVel = vel.copy().multiplyEq( (Math.random() + 19) / 20);
@@ -320,7 +330,7 @@
 				pos: myPos.copy(),
 				vel: myVel,
 				grav: 0.3,
-				drag: 0.91,
+				drag: 0.92,
 				cont: cont,
 				img: imgs.random(),
 				timer: 23,
@@ -350,6 +360,7 @@
 		var cont = function(p) { p.stretch = 8; return --p.timer > 0 || Math.random() > 0.25; }
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
+		var scale = 0.15 + Math.random() * 0.1;
 		var img = this.imgs.ring.random();
 		var numP = this.scaleParticleCount(mag * 2);
 		var myPos = new Vector3(pos.x, pos.y, pos.z);
@@ -363,7 +374,7 @@
 				drag: 0.91,
 				cont: cont,
 				img: img,
-				scale: 0.2,
+				scale: scale,
 				timer: 23,
 				x: op.x,
 				y: op.y
@@ -375,7 +386,7 @@
 				drag: 0.91,
 				cont: cont,
 				img: img,
-				scale: 0.2,
+				scale: scale,
 				timer: 23,
 				x: op.x,
 				y: op.y
@@ -519,11 +530,17 @@
 
 	Fireworks.prototype.render = function() {
 		var frameStartTime = (new Date()).getTime();
+		var self = this;
 		if ( this.stopped )
 			return;
 		if ( this.loading > 0 ) {
-			var self = this;
-			this.timer = setTimeout(function(){self.render();}, 10);
+			this.frameDueTime = (new Date()).getTime() + 100;
+			this.timer = setTimeout(function(){self.render();}, 1);
+			return;
+		}
+		if ( this.frameCache.length >= this.frameCacheSize ) {
+			this.nextFrame();
+			setTimeout(function(){self.render();}, 1);
 			return;
 		}
 
@@ -532,17 +549,19 @@
 			this.startCallback = null;
 		}
 
+		this.nextFrame();
+
 		var i;
 		if ( !this.isMouseDown ) {
-			for ( var frames = Math.floor( this.lastRenderTime / this.renderInterval ) + 1; frames > 0; frames = 0 * Math.floor(frames / 2) ) {
-				if ( frames > 100 ) {
+			for ( var frames = Math.floor( this.lastRenderTime / this.frameInterval ) + 1; frames > 0; frames = 0 * Math.floor(frames / 2) ) {
+				if ( frames > 1 ) {
 					for ( i = 0; i < this.particles.length; i++ ) {
 						if ( this.particles[i].enabled ) {
 							this.particles[i].disable();
 							i += 6;
 						}
 					}
-					this.particleDensity -= (this.particleDensity - this.minParticleDensity) / 50;
+					this.particleDensity -= (this.particleDensity - this.minParticleDensity) / 20;
 				} else {
 					this.particleDensity += (this.maxParticleDensity - this.particleDensity) / 200;
 				}
@@ -552,8 +571,11 @@
 					this.step = ++this.step % this.timeline.length; // loop
 				}
 				++this.tick;
-				for (i = 0; i < this.particles.length; i++)
+				for (i = 0; i < this.particles.length; i++) {
+					if ( i % 100 == 0 && this.frameCache.length > 0 )
+						this.nextFrame();
 					this.particles[i].update(i);
+				}
 			}
 			this.context.fillStyle = "rgba(0,0,0,0.25)";
 		} else {
@@ -571,17 +593,22 @@
 		// Draw from farthest to nearest
 		this.particles.sort(this.compareZPos);
 		for (i = 0; i < this.particles.length; i++) {
+			if ( i % 100 == 0 && this.frameCache.length > 0 )
+				this.nextFrame();
 			if ( this.particles[i].enabled )
 				this.draw3Din2D(this.particles[i]);
 		}
 		this.lastRenderTime = (new Date()).getTime() - frameStartTime;
-		$("#debug").html(this.lastRenderTime);
-		var self = this;
-		this.timer = setTimeout(function(){self.render();}, Math.max(10, this.renderInterval - this.lastRenderTime));
+		this.frameCache.push( this.context.getImageData(0, 0, this.canvas.width, this.canvas.height) );
+		this.nextFrame();
+		setTimeout(function(){self.render();}, 1);
 	};
 
-	Fireworks.prototype.nextFrame = function() {
-		
+	Fireworks.prototype.nextFrame = function(d, i) {
+		if ( this.frameCache.length > 0 && (new Date()).getTime() >= this.frameDueTime ) {
+			this.displayContext.putImageData( this.frameCache.shift(), 0, 0 );
+			this.frameDueTime += this.frameInterval;
+		}
 	};
 
 	Fireworks.prototype.compareZPos = function(a, b) {
