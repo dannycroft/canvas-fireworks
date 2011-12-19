@@ -79,6 +79,11 @@
 			return this.each(function(){
 				$(this).data("fireworks").stop();
 			});
+		},
+		pause : function() {
+			return this.each(function(){
+				$(this).data("fireworks").pause();
+			});
 		}
 	};
 
@@ -123,6 +128,13 @@
 		this.stopped = true;
 		clearTimeout(this.timer);
 		return this;
+	};
+
+	Fireworks.prototype.pause = function() {
+		if ( this.stopped )
+			this.start();
+		else
+			this.stop();
 	};
 
 	/**
@@ -547,8 +559,12 @@
 		}
 
 		if ( typeof this.startCallback == "function" ) {
-			this.startCallback.call();
+			var delay = parseInt(this.startCallback.call());
 			this.startCallback = null;
+			if ( delay > 0 ) {
+				this.timer = setTimeout(function(){self.render();}, delay);
+				return;
+			}
 		}
 
 		this.nextFrame();
