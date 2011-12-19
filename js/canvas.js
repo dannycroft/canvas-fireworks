@@ -28,7 +28,7 @@
 			rocket    : "img/electric.png",
 			explosion : "img/spark.png",
 			core      : "img/spark.png",
-			shell     : "img/star.png",
+			shell     : "img/electric.png",
 			ring      : "img/electric.png",
 			logo      : "img/star.png",
 		},
@@ -36,7 +36,7 @@
 			logo      : "img/w.png"
 		},
 		spriteColors : {
-			rocket    : [blue, white, moss],
+			rocket    : [white],
 			explosion : [yellow, white],
 			core      : [orange, yellow, blue, white, moss],
 			shell     : [green, red, orange, tan, green, white, white, white, sky, blue],
@@ -79,7 +79,7 @@
 	};
 
 	function Fireworks(options) {
-		$.extend(true, this, defaults, options); // Allow opts to override the vars above
+		$.extend(true, this, defaults, options); // Allow opts to override the defaults
 		this.loadSprites(); // blocks animation while loading sprites
 	};
 
@@ -87,10 +87,12 @@
 		this.canvas = canvas;
 		this.canvas.width = this.canvas.clientWidth;
 		this.canvas.height = this.canvas.clientHeight;
+		this.w2 = this.canvas.width / 2;
+		this.h2 = this.canvas.height / 2;
 		this.context = this.canvas.getContext("2d");
 		var self = this;
 		$(canvas).bind('mousedown.fireworks', function() {self.isMouseDown = true;});
-		$(window).bind('mousemove.fireworks', function(e) {self.mouseX = e.pageX - self.canvas.offsetLeft - self.canvas.width / 2;});
+		$(window).bind('mousemove.fireworks', function(e) {self.mouseX = e.pageX - self.canvas.offsetLeft - self.w2;});
 		$(window).bind('mouseup.fireworks', function() {self.isMouseDown = false;});
 		this.lastMouseX = 0;
 		this.mouseX = 0;
@@ -266,9 +268,10 @@
 	}
 
 	Fireworks.prototype.launchRocket = function(idx) {
-		opts={
-			scale: Math.round(Math.random() * 2) / 8,
-			stretch: true,
+		var fireworks = this;
+		this.getParticle({
+			scale: .15,
+			stretch: 5,
 			pos: new Vector3(Math.random() * 100 - 50, Math.random() * 3 + 190, Math.random() * 4 - 2),
 			vel: new Vector3(Math.random() * 12 - 6, Math.random() * 6 - 20, Math.random() * 6 - 3),
 			img: this.imgs.rocket.random(),
@@ -278,23 +281,21 @@
 				// Continue while rising
 				if ( particle.vel.y < -1.5 )
 					return true;
-				this.update(0, true);
-				// Spawn explosion particles
+				// Spawn explosions
 				particle.stretch = false;
-				particle.fireworks.explodeCore(particle.pos, particle.data[0]);
-				particle.fireworks.explodeShell(particle.pos, particle.data[1], particle);
-				particle.fireworks.explodeRing(particle.pos, particle.data[2], particle);
+				fireworks.explodeCore(particle.pos, particle.data[0]);
+				fireworks.explodeShell(particle.pos, particle.data[1], particle);
+				fireworks.explodeRing(particle.pos, particle.data[2], particle);
 				// Become bright, expand, contract, fade away
-				particle.img = particle.fireworks.imgs.explosion.random();
+				particle.img = fireworks.imgs.explosion.random();
 				particle.vel = new Vector3(0, 0, 0);
-				particle.grav = 0;
+				particle.grav = 0.1;
 				var x = Math.max(Math.sqrt(particle.data[0]) / 20, 0.25);
 				particle.scales = [2,4,5,5,4,4,3,3,2,2,0].map(function(s){return s*x;});
 				particle.cont = function(particle) { return particle.scale = particle.scales.shift(); };
 				return true;
 			}
-		};
-		this.getParticle(opts);
+		});
 	};
 
 	Fireworks.prototype.explodeShell = function(pos, mag, op) {
@@ -302,25 +303,17 @@
 			return;
 		var root = Math.sqrt(mag) + 1;
 		var vel = new Vector3(root, root, root);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
-		var scale = 1;
+		var scale = 0.2;
+		var cont = function(p) { p.stretch = 6; return --p.timer > 0 || Math.random() > 0.25; }
 		var imgs = [];
-		if ( Math.random() > 0.5 ) {
-			imgs[0] = this.imgs.shell.random();
-			if ( Math.random() > 0.8 )
-				imgs[1] = this.imgs.shell.random();
-			scale = (Math.random() / 2) + 0.75;
-		} else {
-			imgs[0] = this.imgs.ring.random();
-			if ( Math.random() > 0.8 )
-				imgs[1] = this.imgs.shell.random();
-			scale = (Math.random() / 2) + 0.25;
-		}
-		// Spawn a symmetrical pair of particles for each unit magnitude
-		var numP = this.scaleParticleCount(mag * 3);
+		do {
+			imgs.push(this.imgs.shell.random());
+		} while ( Math.random() > 0.7 );
+		// Spawn a symmetrical pair of particles at a time
+		var numP = this.scaleParticleCount(mag * 6);
 		var myPos = new Vector3(pos.x, pos.y, pos.z);
-		for ( var i = 0; i < numP; ++i ) {
-			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+		for ( var i = 0; i < numP; i += 2 ) {
+			vel.rotate(Math.random() * 6, Math.random() * 6, Math.random() * 6);
 			var myVel = vel.copy().multiplyEq( (Math.random() + 19) / 20);
 			this.getParticle({
 				scale: scale,
@@ -354,7 +347,7 @@
 			return;
 		var root = Math.sqrt(mag) * 0.8 + 1;
 		var vel = new Vector3(root, 0, root);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
+		var cont = function(p) { p.stretch = 8; return --p.timer > 0 || Math.random() > 0.25; }
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
 		var img = this.imgs.ring.random();
@@ -364,27 +357,25 @@
 			vel.rotateY(Math.random() * 3);
 			var myVel = vel.copy().rotateX(rX).rotateZ(rZ).multiplyEq( 1.5 + Math.random() / 5 );
 			this.getParticle({
-				stretch: true,
 				pos: myPos.copy(),
 				vel: myVel,
 				grav: 0.3,
 				drag: 0.91,
 				cont: cont,
 				img: img,
-				scale: 0.5,
+				scale: 0.2,
 				timer: 23,
 				x: op.x,
 				y: op.y
 			});
 			this.getParticle({
-				stretch: true,
 				pos: myPos.copy(),
 				vel: myVel.invert(),
 				grav: 0.3,
 				drag: 0.91,
 				cont: cont,
 				img: img,
-				scale: 0.5,
+				scale: 0.2,
 				timer: 23,
 				x: op.x,
 				y: op.y
@@ -485,15 +476,44 @@
 
 	Fireworks.prototype.draw3Din2D = function(particle) {
 		if ( particle.scale > 0 ) {
+			var mult = 6;
 			var scale = this.fov / ( this.fov + particle.pos.z );
-			var x2d = ( particle.pos.x * scale) + this.canvas.width / 2;
-			var y2d = ( particle.pos.y * scale) + this.canvas.height / 2;
-			scale *= 6 * particle.scale;
+			var x2d = ( particle.pos.x * scale) + this.w2;
+			var y2d = ( particle.pos.y * scale) + this.h2;
+			if ( particle.x2d === false ) {
+				// If particle was just spawned, estimate the previous postion for blur
+				var scaleOld = this.fov / ( this.fov + particle.pos.z - particle.vel.z );
+				particle.x2d = ( particle.pos.x - particle.vel.x ) * scaleOld + this.w2;
+				particle.y2d = ( particle.pos.y - particle.vel.y ) * scaleOld + this.h2;
+			}
 			this.context.save();
-			this.context.translate( x2d, y2d );
-			particle.transform(this.context, x2d, y2d, !this.isMouseDown);
-			this.context.drawImage(particle.img, 0, 0, scale * 2, scale * 2);
+
+			// Think of transforms as LIFO: the first one called is the last one applied.
+			this.context.translate( x2d, y2d ); // 5: move the particle into position
+			this.context.scale(scale, scale); // 4: scale for distance (pos.z)
+
+			// Motion blur
+			var distance = 0;
+			if ( particle.stretch && !this.isMouseDown ) {
+				var dx = x2d - particle.x2d;
+				var dy = y2d - particle.y2d;
+				var angle = Math.atan2( dy, dx );
+				if ( angle < 0 )
+					angle += Math.PI * 2;
+				distance = Math.sqrt( Math.pow( dx, 2 ) + Math.pow( dy, 2 ) );
+				this.context.rotate(angle); // 3: rotate to direction of motion
+				this.context.translate(- distance / 2, 0); // 2: move center backward along direction of motion
+				this.context.scale(1 + distance / mult * particle.stretch, 1); // 1: scale by 2d projected distance
+			}
+
+			// draw image centered at origin
+			this.context.drawImage(particle.img, - particle.scale * mult, - particle.scale * mult, particle.scale * 2 * mult, particle.scale * 2 * mult);
+
+			// undo transforms
 			this.context.restore();
+
+			particle.x2d = x2d;
+			particle.y2d = y2d;
 		}
 	};
 
@@ -515,7 +535,7 @@
 		var i;
 		if ( !this.isMouseDown ) {
 			for ( var frames = Math.floor( this.lastRenderTime / this.renderInterval ) + 1; frames > 0; frames = 0 * Math.floor(frames / 2) ) {
-				if ( frames > 1 ) {
+				if ( frames > 100 ) {
 					for ( i = 0; i < this.particles.length; i++ ) {
 						if ( this.particles[i].enabled ) {
 							this.particles[i].disable();
@@ -554,9 +574,14 @@
 			if ( this.particles[i].enabled )
 				this.draw3Din2D(this.particles[i]);
 		}
-		this.lastRenderTime = (new Date()) - frameStartTime;
+		this.lastRenderTime = (new Date()).getTime() - frameStartTime;
+		$("#debug").html(this.lastRenderTime);
 		var self = this;
 		this.timer = setTimeout(function(){self.render();}, Math.max(10, this.renderInterval - this.lastRenderTime));
+	};
+
+	Fireworks.prototype.nextFrame = function() {
+		
 	};
 
 	Fireworks.prototype.compareZPos = function(a, b) {
@@ -636,13 +661,15 @@
 	}
 
 	Particle.prototype.defaults = {
+		pos: {},
+		vel: {},
 		grav: 1,
 		drag: 1,
 		enabled: true,
 		data: null,
 		scale: 1,
-		x: false,
-		y: false,
+		x2d: false,
+		y2d: false,
 		stretch: false,
 		imgs: false,
 		expendable: true,
@@ -668,26 +695,6 @@
 				this.disable(true);
 			}
 		}
-	};
-
-	Particle.prototype.transform = function(context, x, y, stretch) {
-		if ( this.x === false ) {
-			this.x = x;
-			this.y = y;
-		}
-		if ( this.stretch && stretch ) {
-			var dx = x - this.x;
-			var dy = y - this.y;
-			var angle = Math.atan2( dy, dx );
-			if ( angle < 0 )
-				angle += Math.PI * 2;
-			var distance = Math.sqrt( Math.pow( dx, 2 ) + Math.pow( dy, 2 ) );
-			context.rotate(angle);
-			context.scale(distance / this.scale / 5, 1);
-		}
-		context.translate(- this.scale * 6, - this.scale * 6);
-		this.x = x;
-		this.y = y;
 	};
 
 	Particle.prototype.disable = function(force) {
