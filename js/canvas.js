@@ -455,25 +455,22 @@
 		var i = 0, halfx = raster.width / 2, halfy = raster.height / 2, x, y, vx, vy;
 		var rx = Math.random() - 0.5, ry = Math.random() - 0.5, rz = Math.random() - 0.5;
 		var img = this.imgs[name].random();
-		var pCount = 0;
 		for ( var row = 0; row < raster.height; ++row ) {
 			y = row - halfy;
 			for ( var col = 0; col < raster.width; ++col ) {
 				if ( imageData.data[i+3] > 127 ) {
 					x = col - halfx;
-					if ( Math.floor(pCount + this.particleDensity) > pCount ) {
-						this.getParticle({
-							pos: new Vector3(pos.x + x / 10, pos.y + y / 10, pos.z),
-							vel: (new Vector3(x, y, 0)).multiplyEq(root / 10 + Math.random() / 10).rotate(rx, ry, rz),
-							grav: .4,
-							drag: .9,
-							cont: cont,
-							img: img,
-							scale: 1,
-							timer: 23,
-						});
-					}
-					pCount += this.particleDensity;
+					this.getParticle({
+						pos: new Vector3(pos.x + x / 10, pos.y + y / 10, pos.z),
+						vel: (new Vector3(x, y, 0)).multiplyEq(root / 10 + Math.random() / 10).rotate(rx, ry, rz),
+						grav: .4,
+						drag: .9,
+						cont: cont,
+						img: img,
+						scale: 1,
+						timer: 23,
+						expendable: false,
+					});
 				}
 				i += 4;
 			}
