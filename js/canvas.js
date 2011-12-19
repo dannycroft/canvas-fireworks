@@ -598,6 +598,30 @@
 			if ( this.particles[i].enabled )
 				this.draw3Din2D(this.particles[i]);
 		}
+
+		// Draw some spotlights on the sky
+		this.context.beginPath();
+		this.context.moveTo(Math.floor(this.canvas.width / 3), this.canvas.height);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + 200 * Math.sin(this.tick / 19)), 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + 200 * Math.sin(this.tick / 19) + 100), 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 3 + 15), this.canvas.height);
+		this.context.fillStyle = "rgba(5,5,40,0.2)";
+		this.context.fill();
+		this.context.beginPath();
+		this.context.moveTo(Math.floor(2 * this.canvas.width / 3), this.canvas.height);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 23)) - 100, 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 23)), 0);
+		this.context.lineTo(Math.floor(2 * this.canvas.width / 3 + 15), this.canvas.height);
+		this.context.fillStyle = "rgba(15,5,30,0.2)";
+		this.context.fill();
+		this.context.beginPath();
+		this.context.moveTo(Math.floor(2 * this.canvas.width / 3) + 40, this.canvas.height);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 29)) - 100, 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 29)), 0);
+		this.context.lineTo(Math.floor(2 * this.canvas.width / 3) + 55, this.canvas.height);
+		this.context.fillStyle = "rgba(5,15,30,0.2)";
+		this.context.fill();
+
 		this.lastRenderTime = (new Date()).getTime() - frameStartTime;
 		this.frameCache.push( this.context.getImageData(0, 0, this.canvas.width, this.canvas.height) );
 		this.nextFrame();
