@@ -605,10 +605,14 @@
 	};
 
 	Fireworks.prototype.nextFrame = function(d, i) {
-		if ( this.frameCache.length > 0 && (new Date()).getTime() >= this.frameDueTime ) {
-			this.displayContext.putImageData( this.frameCache.shift(), 0, 0 );
-			this.frameDueTime += this.frameInterval;
-		}
+		if ( this.frameCache.length == 0 )
+			return;
+		var time = (new Date()).getTime();
+		if ( time < this.frameDueTime )
+			return;
+
+		this.displayContext.putImageData( this.frameCache.shift(), 0, 0 );
+		this.frameDueTime = time + this.frameInterval;
 	};
 
 	Fireworks.prototype.compareZPos = function(a, b) {
