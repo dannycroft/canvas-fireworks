@@ -517,6 +517,8 @@
 				this.context.scale(1 + distance / mult * particle.stretch, 1); // 1: scale by 2d projected distance
 			}
 
+			this.context.globalAlpha = particle.alpha;
+
 			// draw image centered at origin
 			this.context.drawImage(particle.img, - particle.scale * mult, - particle.scale * mult, particle.scale * 2 * mult, particle.scale * 2 * mult);
 
@@ -598,6 +600,7 @@
 			if ( this.particles[i].enabled )
 				this.draw3Din2D(this.particles[i]);
 		}
+		this.context.globalAlpha = 1;
 
 		// Draw some spotlights on the sky
 		this.context.beginPath();
@@ -728,6 +731,7 @@
 		stretch: false,
 		imgs: false,
 		expendable: true,
+		alpha: 1,
 		cont: function(particle) {
 			return particle.enabled;
 		}
@@ -735,6 +739,9 @@
 
 	Particle.prototype.reset = function(opts) {
 		$.extend(this, this.defaults, opts);
+		// Particles moving away from observer should appear less bright
+		if ( this.vel.z > 0 )
+			this.alpha = 1 - ( this.vel.z / this.vel.magnitude() * .75 );
 	};
 
 	Particle.prototype.update = function(i, cont) {
