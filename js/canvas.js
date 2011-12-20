@@ -542,8 +542,6 @@
 	Fireworks.prototype.render = function() {
 		var frameStartTime = (new Date()).getTime();
 		var self = this;
-		if ( this.stopped )
-			return;
 		if ( this.loading > 0 ) {
 			this.frameDueTime = (new Date()).getTime() + 100;
 			this.timer = setTimeout(function(){self.render();}, 1);
@@ -646,6 +644,8 @@
 	};
 
 	Fireworks.prototype.nextFrame = function(d, i) {
+		if ( this.stopped )
+			return;
 		if ( this.frameCache.length == 0 )
 			return;
 		var time = (new Date()).getTime();
