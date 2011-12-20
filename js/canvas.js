@@ -346,8 +346,8 @@
 				cont: cont,
 				img: imgs.random(),
 				timer: 23,
-				x: op.x,
-				y: op.y
+				x2d: op.x2d,
+				y2d: op.y2d
 			});
 			this.getParticle({
 				scale: scale,
@@ -358,8 +358,8 @@
 				cont: cont,
 				img: imgs.random(),
 				timer: 23,
-				x: op.x,
-				y: op.y
+				x2d: op.x2d,
+				y2d: op.y2d
 			});
 		}
 	};
@@ -388,8 +388,8 @@
 				img: img,
 				scale: scale,
 				timer: 23,
-				x: op.x,
-				y: op.y
+				x2d: op.x2d,
+				y2d: op.y2d
 			});
 			this.getParticle({
 				pos: myPos.copy(),
@@ -400,8 +400,8 @@
 				img: img,
 				scale: scale,
 				timer: 23,
-				x: op.x,
-				y: op.y
+				x2d: op.x2d,
+				y2d: op.y2d
 			});
 		}
 	};
@@ -605,8 +605,9 @@
 		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 		this.context.globalCompositeOperation = "lighter";
 		this.lastMouseX = this.mouseX;
-		// Draw from farthest to nearest
-		this.particles.sort(this.compareZPos);
+
+		// Draw particles (unsorted because order is irrelevant in "lighter" mode)
+		//this.particles.sort(this.compareZPos);
 		for (i = 0; i < this.particles.length; i++) {
 			if ( i % 100 == 0 && this.frameCache.length > 0 )
 				this.nextFrame();
