@@ -20,6 +20,7 @@
 
 	var defaults = {
 		debug : true,
+		baseHref : "",
 		frameRateMin : 12.5,
 		frameRateMax : 20,
 		frameInterval : 50, // ms between rendered frames
@@ -239,7 +240,7 @@
 		$.each(this.sprites, function(name, url) {
 			++self.loading;
 			var img = new Image();
-			img.src = url;
+			img.src = self.baseHref + url;
 			img.onload = function() {
 				if ( typeof self.imgs[name] != "object" )
 					self.imgs[name] = [];
@@ -250,7 +251,7 @@
 		$.each(this.rasters, function(name, url) {
 			++self.loading;
 			self.rasters[name] = new Image();
-			self.rasters[name].src = url;
+			self.rasters[name].src = self.baseHref + url;
 			self.rasters[name].onload = function() {
 				--self.loading;
 			};
