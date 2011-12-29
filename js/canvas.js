@@ -19,9 +19,15 @@
 	    white  = "#FFFFFF";
 
 	var defaults = {
+		debug : true,
+		frameRateMin : 12.5,
+		frameRateMax : 20,
 		frameInterval : 50, // ms between rendered frames
+		stepIntervalMin : 60,
+		stepIntervalMax : 20,
 		stepInterval : 20, // ticks between timeline steps
-		frameCacheSize : 20, // number of frame to generate in advance
+		lastStepTick : -100, // tick of last timeline step
+		frameCacheSize : 20, // number of frames to generate in advance
 		drag : 0.01, // velocity lost per frame
 		gravity : 0.5, // downward acceleration
 		wind : -0.2, // horizontal slide applied to everything each frame
@@ -42,7 +48,7 @@
 			core      : [orange, yellow, blue, white, moss],
 			shell     : [green, red, orange, tan, green, white, white, white, sky, blue],
 			ring      : [red, orange, white, sky, tan],
-			logo      : [blue, green, orange, sky],
+			logo      : [blue, green, orange, sky]
 		},
 		fov : 500,
 		imgs : {}, // loaded sprites
@@ -53,12 +59,16 @@
 		step : 0, // one per timeline event
 		timer : null, // from setInterval
 		stopped : false,
-		maxParticleDensity : 1.5,
-		minParticleDensity : 0.5,
+		particleDensityMax : 2.00,
+		particleDensityMin : 0.25,
 		particleDensity : 1,
 		frameCache : [],
 		frameCacheIndex : 0,
 		startCallback : null,
+		burnoutMod : 100, // modulo for early burnout. higher number allows particles to last longer.
+		renderQuality : 100, // on a scale of 0-100
+		renderQualityAcc : 0,
+		renderQualityCt : 0,
 	};
 
 	var methods = {
@@ -97,15 +107,10 @@
 		this.displayCanvas = canvas;
 		this.displayCanvas.width = this.displayCanvas.clientWidth;
 		this.displayCanvas.height = this.displayCanvas.clientHeight;
+		this.w2 = this.displayCanvas.width / 2;
+		this.h2 = this.displayCanvas.height / 2;
 		this.displayContext = this.displayCanvas.getContext("2d");
 
-		// This is the canvas that we draw frames on.
-		this.canvas = document.createElement("canvas");
-		this.canvas.width = this.displayCanvas.clientWidth;
-		this.canvas.height = this.displayCanvas.clientHeight;
-		this.w2 = this.canvas.width / 2;
-		this.h2 = this.canvas.height / 2;
-		this.context = this.canvas.getContext("2d");
 /*
 		var self = this;
 		$(canvas).bind('mousedown.fireworks', function() {self.isMouseDown = true;});
@@ -117,16 +122,25 @@
 		return this;
 	};
 
+	Fireworks.prototype.newCanvas = function() {
+		this.canvas = document.createElement("canvas");
+		this.canvas.width = this.displayCanvas.width;
+		this.canvas.height = this.displayCanvas.height;
+		this.context = this.canvas.getContext("2d");
+	};
+
 	Fireworks.prototype.start = function() {
 		this.stopped = false;
-		this.lastRenderTime = 1;
-		this.render();
+		this.frameDueTime = (new Date()).getTime() + 100;
+		var self = this;
+		this.timer = setInterval(function(){self.nextFrame()}, 1);
+		setTimeout(function(){self.render()}, 50);
 		return this;
 	};
 
 	Fireworks.prototype.stop = function() {
 		this.stopped = true;
-		clearTimeout(this.timer);
+		clearInterval(this.timer);
 		return this;
 	};
 
@@ -331,7 +345,7 @@
 		do {
 			imgs.push(this.imgs.shell.random());
 		} while ( Math.random() > 0.7 );
-		var numP = this.scaleParticleCount(mag * 8);
+		var numP = this.scaleParticleCount(20 + mag * 2);
 		var myPos = new Vector3(pos.x, pos.y, pos.z);
 		// Spawn a symmetrical pair of particles at a time
 		for ( var i = 0; i < numP; i += 2 ) {
@@ -374,7 +388,7 @@
 		var rZ = 1 - 2 * Math.random();
 		var scale = 0.15 + Math.random() * 0.1;
 		var img = this.imgs.ring.random();
-		var numP = this.scaleParticleCount(mag * 2);
+		var numP = this.scaleParticleCount(mag);
 		var myPos = new Vector3(pos.x, pos.y, pos.z);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotateY(Math.random() * 3);
@@ -412,7 +426,7 @@
 		var root = Math.sqrt(mag) / 3;
 		var vel = new Vector3(root, root, root);
 		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
-		var numP = 5 + this.scaleParticleCount(mag / 20);
+		var numP = 2 + this.scaleParticleCount(mag / 20);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
 			var myVel = vel.copy().multiplyEq( Math.random() / 2 + .25);
@@ -481,6 +495,10 @@
 		return c * this.particleDensity;
 	};
 
+	Fireworks.prototype.scaleByQuality = function(min, max) {
+		return min + this.renderQuality * ( max - min ) / 100;
+	};
+
 	Fireworks.prototype.getParticle = function(opts) {
 		var particle;
 		if (this.spareParticles.length == 0) {
@@ -494,126 +512,7 @@
 		return particle;
 	};
 
-	Fireworks.prototype.draw3Din2D = function(particle) {
-		if ( particle.scale > 0 ) {
-			var mult = 6;
-			var scale = this.fov / ( this.fov + particle.pos.z );
-			var x2d = ( particle.pos.x * scale) + this.w2;
-			var y2d = ( particle.pos.y * scale) + this.h2;
-			if ( particle.x2d === false ) {
-				// If particle was just spawned, estimate the previous postion for blur
-				var scaleOld = this.fov / ( this.fov + particle.pos.z - particle.vel.z );
-				particle.x2d = ( particle.pos.x - particle.vel.x ) * scaleOld + this.w2;
-				particle.y2d = ( particle.pos.y - particle.vel.y ) * scaleOld + this.h2;
-			}
-			this.context.save();
-
-			// Think of transforms as LIFO: the first one called is the last one applied.
-			this.context.translate( x2d, y2d ); // 5: move the particle into position
-			this.context.scale(scale, scale); // 4: scale for distance (pos.z)
-
-			// Motion blur
-			var distance = 0;
-			if ( particle.stretch && !this.isMouseDown ) {
-				var dx = x2d - particle.x2d;
-				var dy = y2d - particle.y2d;
-				var angle = Math.atan2( dy, dx );
-				if ( angle < 0 )
-					angle += Math.PI * 2;
-				distance = Math.sqrt( Math.pow( dx, 2 ) + Math.pow( dy, 2 ) );
-				this.context.rotate(angle); // 3: rotate to direction of motion
-				this.context.translate(- distance / 2, 0); // 2: move center backward along direction of motion
-				this.context.scale(1 + distance / mult * particle.stretch, 1); // 1: scale by 2d projected distance
-			}
-
-			this.context.globalAlpha = particle.alpha;
-
-			// draw image centered at origin
-			this.context.drawImage(particle.img, - particle.scale * mult, - particle.scale * mult, particle.scale * 2 * mult, particle.scale * 2 * mult);
-
-			// undo transforms
-			this.context.restore();
-
-			particle.x2d = x2d;
-			particle.y2d = y2d;
-		}
-	};
-
-	Fireworks.prototype.render = function() {
-		var frameStartTime = (new Date()).getTime();
-		var self = this;
-		if ( this.loading > 0 ) {
-			this.frameDueTime = (new Date()).getTime() + 100;
-			this.timer = setTimeout(function(){self.render();}, 1);
-			return;
-		}
-		if ( this.frameCache.length >= this.frameCacheSize ) {
-			this.nextFrame();
-			setTimeout(function(){self.render();}, 1);
-			return;
-		}
-
-		if ( typeof this.startCallback == "function" ) {
-			var delay = parseInt(this.startCallback.call());
-			this.startCallback = null;
-			if ( delay > 0 ) {
-				this.timer = setTimeout(function(){self.render();}, delay);
-				return;
-			}
-		}
-
-		this.nextFrame();
-
-		var i;
-		if ( !this.isMouseDown ) {
-			for ( var frames = Math.floor( this.lastRenderTime / this.frameInterval ) + 1; frames > 0; frames = 0 * Math.floor(frames / 2) ) {
-				if ( frames > 1 ) {
-					for ( i = 0; i < this.particles.length; i++ ) {
-						if ( this.particles[i].enabled ) {
-							this.particles[i].disable();
-							i += 6;
-						}
-					}
-					this.particleDensity -= (this.particleDensity - this.minParticleDensity) / 20;
-				} else {
-					this.particleDensity += (this.maxParticleDensity - this.particleDensity) / 200;
-				}
-				if ( this.tick % this.stepInterval == 0 ) {
-					for ( var i = 0; i < this.timeline[this.step].length; ++i )
-						this.launchRocket(i);
-					this.step = ++this.step % this.timeline.length; // loop
-				}
-				++this.tick;
-				for (i = 0; i < this.particles.length; i++) {
-					if ( i % 100 == 0 && this.frameCache.length > 0 )
-						this.nextFrame();
-					this.particles[i].update(i);
-				}
-			}
-			this.context.fillStyle = "rgba(0,0,0,0.25)";
-		} else {
-			for (i = 0; i < this.particles.length; i++) {
-				this.particles[i].pos.rotateY((this.lastMouseX - this.mouseX) * 0.01);
-				this.particles[i].vel.rotateY((this.lastMouseX - this.mouseX) * 0.01);
-			}
-			this.context.fillStyle = "rgba(0,0,0,0.5)";
-		}
-		// Fade the previous frame
-		this.context.globalCompositeOperation = "source-over";
-		this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-		this.context.globalCompositeOperation = "lighter";
-		this.lastMouseX = this.mouseX;
-
-		// Draw particles (unsorted because order is irrelevant in "lighter" mode)
-		//this.particles.sort(this.compareZPos);
-		for (i = 0; i < this.particles.length; i++) {
-			if ( i % 100 == 0 && this.frameCache.length > 0 )
-				this.nextFrame();
-			if ( this.particles[i].enabled )
-				this.draw3Din2D(this.particles[i]);
-		}
-		this.context.globalAlpha = 1;
-
+	Fireworks.prototype.drawSpotlights = function() {
 		// Draw some spotlights on the sky
 		this.context.beginPath();
 		this.context.moveTo(Math.floor(this.canvas.width / 3), this.canvas.height);
@@ -636,24 +535,156 @@
 		this.context.lineTo(Math.floor(2 * this.canvas.width / 3) + 55, this.canvas.height);
 		this.context.fillStyle = "rgba(5,15,30,0.2)";
 		this.context.fill();
-
-		this.lastRenderTime = (new Date()).getTime() - frameStartTime;
-		this.frameCache.push( this.context.getImageData(0, 0, this.canvas.width, this.canvas.height) );
-		this.nextFrame();
-		setTimeout(function(){self.render();}, 1);
 	};
 
-	Fireworks.prototype.nextFrame = function(d, i) {
+	Fireworks.prototype.draw3Din2D = function(particle) {
+		if ( particle.scale > 0 ) {
+			var mult = 6;
+			var scale = this.fov / ( this.fov + particle.pos.z );
+			var x2d = ( particle.pos.x * scale) + this.w2;
+			var y2d = ( particle.pos.y * scale) + this.h2;
+			if ( particle.x2d === false ) {
+				// If particle was just spawned, estimate the previous postion for blur
+				var scaleOld = this.fov / ( this.fov + particle.pos.z - particle.vel.z );
+				particle.x2d = ( particle.pos.x - particle.vel.x ) * scaleOld + this.w2;
+				particle.y2d = ( particle.pos.y - particle.vel.y ) * scaleOld + this.h2;
+			}
+			// Think of transforms as LIFO: the first one called is the last one applied.
+			this.context.translate( x2d, y2d ); // 5: move the particle into position
+			this.context.scale(scale, scale); // 4: scale for distance (pos.z)
+			// Motion blur
+			if ( particle.stretch && !this.isMouseDown ) {
+				var dx = x2d - particle.x2d;
+				var dy = y2d - particle.y2d;
+				var angle = Math.atan2( dy, dx );
+				if ( angle < 0 )
+					angle += Math.PI * 2;
+				var distance = Math.sqrt( Math.pow( dx, 2 ) + Math.pow( dy, 2 ) );
+				this.context.rotate(angle); // 3: rotate to direction of motion
+				this.context.translate(- distance / 2, 0); // 2: move center backward along direction of motion
+				this.context.scale(1 + distance / mult * particle.stretch, 1); // 1: scale by 2d projected distance
+			}
+			this.context.globalAlpha = particle.alpha;
+			// draw image centered at origin
+			var scaleMult = particle.scale * mult;
+			this.context.drawImage(particle.img, - scaleMult, - scaleMult, 2 * scaleMult, 2 * scaleMult);
+			// reset to identity matrix
+			this.context.setTransform(1, 0, 0, 1, 0, 0);
+			// save 2D projection coords for stretch
+			particle.x2d = x2d;
+			particle.y2d = y2d;
+		}
+	};
+
+	Fireworks.prototype.render = function() {
+		var frameStartTime = (new Date()).getTime();
+		var self = this;
+		if ( this.loading > 0 ) {
+			this.frameDueTime = (new Date()).getTime() + 100;
+			setTimeout(function(){self.render();}, 5);
+			return;
+		}
+		if ( this.frameCache.length >= this.frameCacheSize ) {
+			this.nextFrame();
+			setTimeout(function(){self.render();}, 5);
+			return;
+		}
+		if ( typeof this.startCallback == "function" ) {
+			var delay = parseInt(this.startCallback.call());
+			this.startCallback = null;
+			if ( delay > 0 ) {
+				setTimeout(function(){self.render();}, delay);
+				return;
+			}
+		}
+		this.nextFrame();
+		if ( this.tick >= this.lastStepTick + this.stepInterval ) {
+			for ( var i = 0; i < this.timeline[this.step].length; ++i )
+				this.launchRocket(i);
+			this.step = ++this.step % this.timeline.length; // loop
+			this.lastStepTick = this.tick;
+		}
+		++this.tick;
+		// If the frame we're drawing is already late then skip the cache.
+		var pushFrame = true;
+		if ( this.frameCache.length == 0 && frameStartTime >= this.frameDueTime ) {
+			pushFrame = false;
+			this.canvas = this.displayCanvas;
+			this.context = this.displayContext;
+			this.fadeFrame();
+			this.frameDueTime = frameStartTime + this.frameInterval;
+		} else {
+			this.newCanvas();
+		}
+		this.context.globalCompositeOperation = "lighter";
+		// Draw particles (unsorted because order is irrelevant in "lighter" mode)
+		//this.particles.sort(this.compareZPos);
+		for (i = 0; i < this.particles.length; i++) {
+			// Periodically check whether the next frame is due.
+			if ( pushFrame ) // && i % 5 == 0 )
+				this.nextFrame();
+			// Particles burn out at a faster rate when the cache is thin.
+			if ( this.particles[i].expendable && (i + this.tick) % this.burnoutMod == 0 ) {
+				this.particles[i].disable();
+			} else {
+				this.particles[i].update(i);
+				if ( this.particles[i].enabled )
+					this.draw3Din2D(this.particles[i]);
+			}
+		}
+		this.context.globalAlpha = 1;
+		this.drawSpotlights();
+		if ( pushFrame )
+			this.frameCache.push( this.canvas );
+		this.nextFrame();
+		setTimeout(function(){self.render();}, 1);
+		this.renderQualityAcc += this.renderQuality;
+		this.renderQualityCt += 1;
+	};
+
+	Fireworks.prototype.fadeFrame = function() {
+		// Fade the previous frame
+		this.displayContext.globalCompositeOperation = "source-over";
+		this.displayContext.fillStyle = "rgba(0,0,0,0.25)";
+		this.displayContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
+	};
+
+	Fireworks.prototype.nextFrame = function() {
 		if ( this.stopped )
 			return;
+		var time = (new Date()).getTime();
+		var late = time - this.frameDueTime;
+		// Better to render a tiny bit early than very late.
+		if ( late < -2 )
+			return;
+		if ( this.debug ) $("#debug").html("cache " + (new Array(this.frameCache.length + 1)).join("|"));
+		if ( this.debug ) $("#debug2").html("late " + (new Array(parseInt(Math.max(0, late + 1)))).join("|"));
 		if ( this.frameCache.length == 0 )
 			return;
-		var time = (new Date()).getTime();
-		if ( time < this.frameDueTime )
-			return;
+		// Slow and simplify the animation when the cache is thin
+		this.updateRenderQuality(late);
+		if ( this.debug ) $("#debug3").html("frameInterval " + this.frameInterval + "<br>density " + this.particleDensity + "<br>burnout " + this.burnoutMod + "<br>stepInterval " + this.stepInterval + "<br>renderQuality " + this.renderQuality + "<br>avgRenderQuality " + (this.renderQualityAcc/this.renderQualityCt));
+		this.fadeFrame();
+		// Add the next frame
+		this.displayContext.globalCompositeOperation = "lighter";
+		this.displayContext.drawImage( this.frameCache.shift(), 0, 0 );
+		this.frameDueTime = time + this.frameInterval - Math.min(late, 10);
+	};
 
-		this.displayContext.putImageData( this.frameCache.shift(), 0, 0 );
-		this.frameDueTime = time + this.frameInterval;
+	Fireworks.prototype.updateRenderQuality = function(late) {
+		var newQ = parseInt( this.frameCache.length / ( this.frameCacheSize - 2 ) * 100 );
+		if ( late > 5 )
+			this.renderQuality = Math.max( 1, this.renderQuality - Math.min(10, late) );
+		else if ( this.tick < 50 )
+			null;
+		else if ( newQ < this.renderQuality )
+			this.renderQuality = newQ;
+		else
+			this.renderQuality = Math.min( 100, this.renderQuality + Math.max( 0.2, (100 - this.renderQuality) / 50 ) );
+		this.frameInterval = parseInt( 1000 / this.scaleByQuality(this.frameRateMin, this.frameRateMax) );
+		this.particleDensity = this.scaleByQuality( this.particleDensityMin, this.particleDensityMax );
+		this.burnoutMod = parseInt( this.scaleByQuality( 10, 100 ) );
+		this.stepInterval = parseInt( this.scaleByQuality( this.stepIntervalMin, this.stepIntervalMax ) );
 	};
 
 	Fireworks.prototype.compareZPos = function(a, b) {
