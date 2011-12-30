@@ -26,7 +26,11 @@
 		stepIntervalMin : 60,
 		stepIntervalMax : 20,
 		stepInterval : 20, // ticks between timeline steps
-		lastStepTick : -100, // tick of last timeline step
+		rocketIntervalMin : 15,
+		rocketIntervalMax : 3,
+		rocketInterval : 3, // ticks between rockets in the same step
+		lastStepTick : 0, // tick of last timeline step
+		lastRocketTick : 0, // tick of last rocket step
 		frameCacheSize : 20, // number of frames to generate in advance
 		drag : 0.01, // velocity lost per frame
 		gravity : 0.5, // downward acceleration
@@ -57,6 +61,7 @@
 		spareParticles : [], // particles ready to be reused
 		tick : 0, // one per rendered frame
 		step : 0, // one per timeline event
+		rocket : false, // index in the current step
 		timer : null, // from setInterval
 		stopped : false,
 		particleDensityMax : 2.00,
@@ -303,7 +308,7 @@
 		}
 	}
 
-	Fireworks.prototype.launchRocket = function(idx) {
+	Fireworks.prototype.launchRocket = function(data) {
 		var fireworks = this;
 		this.getParticle({
 			scale: .15,
@@ -311,7 +316,7 @@
 			pos: new Vector3(Math.random() * 100 - 50, Math.random() * 3 + 190, Math.random() * 4 - 2),
 			vel: new Vector3(Math.random() * 12 - 6, Math.random() * 6 - 20, Math.random() * 6 - 3),
 			img: this.imgs.rocket.random(),
-			data: this.timeline[ this.step ][ idx ],
+			data: data,
 			expendable: false,
 			cont: function(particle) {
 				// Continue while rising
@@ -576,6 +581,25 @@
 		}
 	};
 
+	Fireworks.prototype.nextTick = function() {
+		if ( this.rocket === false && this.tick >= this.lastStepTick + this.stepInterval )
+			this.rocket = 0;
+		if ( this.rocket !== false && this.tick >= this.lastRocketTick + this.rocketInterval ) {
+			var step = this.timeline[this.step];
+			if ( typeof step[this.rocket] == "object" ) {
+				this.launchRocket( step[this.rocket] );
+				this.lastRocketTick = this.tick;
+			}
+			++this.rocket;
+			if ( typeof step[this.rocket] == "undefined" ) {
+				this.rocket = false;
+				this.step = ++this.step % this.timeline.length; // loop
+				this.lastStepTick = this.tick;
+			}
+		}
+		++this.tick;
+	};
+
 	Fireworks.prototype.render = function() {
 		var frameStartTime = (new Date()).getTime();
 		var self = this;
@@ -599,15 +623,7 @@
 			}
 		}
 		this.nextFrame();
-		if ( this.tick >= this.lastStepTick + this.stepInterval ) {
-			for ( var i = 0; i < this.timeline[this.step].length; ++i ) {
-				this.launchRocket(i);
-				this.nextFrame();
-			}
-			this.step = ++this.step % this.timeline.length; // loop
-			this.lastStepTick = this.tick;
-		}
-		++this.tick;
+		this.nextTick();
 		// If the frame we're drawing is already late then skip the cache.
 		var pushFrame = true;
 		if ( this.frameCache.length == 0 && frameStartTime >= this.frameDueTime ) {
@@ -663,13 +679,13 @@
 		// Better to render a tiny bit early than very late.
 		if ( late < -2 )
 			return;
-		if ( this.debug ) $("#debug").html("cache " + (new Array(this.frameCache.length + 1)).join("|"));
-		if ( this.debug ) $("#debug2").html("late " + (new Array(parseInt(Math.max(0, late + 1)))).join("|"));
+		if ( this.debug ) $("#debug").html("frameCache " + (new Array(this.frameCache.length + 1)).join("|"));
+		if ( this.debug ) $("#debug2").html("latency " + Math.max(0, late) + "ms");
 		if ( this.frameCache.length == 0 )
 			return;
 		// Slow and simplify the animation when the cache is thin
 		this.updateRenderQuality(late);
-		if ( this.debug ) $("#debug3").html("frameInterval " + this.frameInterval + "<br>density " + this.particleDensity + "<br>burnout " + this.burnoutMod + "<br>stepInterval " + this.stepInterval + "<br>renderQuality " + this.renderQuality + "<br>avgRenderQuality " + (this.renderQualityAcc/this.renderQualityCt));
+		if ( this.debug ) $("#debug3").html("frameInterval " + this.frameInterval + "<br>density " + this.particleDensity + "<br>burnout " + this.burnoutMod + "<br>stepInterval " + this.stepInterval + "<br>rocketInterval " + this.rocketInterval + "<br>renderQuality " + this.renderQuality + "<br>avgRenderQuality " + (this.renderQualityAcc/this.renderQualityCt));
 		this.fadeFrame();
 		// Add the next frame
 		this.displayContext.globalCompositeOperation = "lighter";
@@ -685,13 +701,14 @@
 			} if ( late > 5 ) {
 				this.renderQuality = Math.max( 1, this.renderQuality - Math.min(10, late) );
 			} else {
-				this.renderQuality = Math.min( 100, this.renderQuality + Math.max( 0.2, (100 - this.renderQuality) / 50 ) );
+				this.renderQuality = Math.min( 100, this.renderQuality + Math.max( 0.2, (100 - this.renderQuality) / 100 ) );
 			}
 		}
 		this.frameInterval = parseInt( 1000 / this.scaleByQuality(this.frameRateMin, this.frameRateMax) );
 		this.particleDensity = this.scaleByQuality( this.particleDensityMin, this.particleDensityMax );
 		this.burnoutMod = parseInt( this.scaleByQuality( 10, 100 ) );
 		this.stepInterval = parseInt( this.scaleByQuality( this.stepIntervalMin, this.stepIntervalMax ) );
+		this.rocketInterval = parseInt( this.scaleByQuality( this.rocketIntervalMin, this.rocketIntervalMax ) );
 	};
 
 	Fireworks.prototype.compareZPos = function(a, b) {
