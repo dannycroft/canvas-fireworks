@@ -25,9 +25,9 @@
 		baseHref : "",
 		frameRateMin : 8,
 		frameRateMax : 20,
-		stepIntervalMin : 60,
+		stepIntervalMin : 40,
 		stepIntervalMax : 30,
-		rocketIntervalMin : 15,
+		rocketIntervalMin : 6,
 		rocketIntervalMax : 3,
 		frameCacheSize : 20, // number of frames to generate in advance
 		drag : 0.01, // velocity lost per frame
@@ -62,7 +62,9 @@
 	};
 
 	var vars = {
+		frameRate : 20, // frames per second
 		frameInterval : 50, // ms between rendered frames
+		timeDelta : 1, // time elapsed per frame
 		stepInterval : 20, // ticks between timeline steps
 		rocketInterval : 3, // ticks between rockets in the same step
 		lastStepTick : 0, // tick of last timeline step
@@ -354,10 +356,11 @@
 	Fireworks.prototype.explodeShell = function(pos, mag, op) {
 		if ( mag <= 0 )
 			return;
+		var fireworks = this;
 		var root = Math.sqrt(mag) + 1;
 		var vel = new Vector3(root, root, root);
 		var scale = 0.15 + Math.random() * 0.1;
-		var cont = function(p) { p.stretch = 6; return --p.timer > 0 || Math.random() > 0.25; }
+		var cont = function(p) { p.stretch = 6; fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; }
 		var imgs = [];
 		do {
 			imgs.push(this.imgs.shell.random());
@@ -398,9 +401,10 @@
 	Fireworks.prototype.explodeRing = function(pos, mag, op) {
 		if ( mag <= 0 )
 			return;
+		var fireworks = this;
 		var root = Math.sqrt(mag) * 0.8 + 1;
 		var vel = new Vector3(root, 0, root);
-		var cont = function(p) { p.stretch = 8; return --p.timer > 0 || Math.random() > 0.25; }
+		var cont = function(p) { p.stretch = 8; fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; }
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
 		var scale = 0.15 + Math.random() * 0.1;
@@ -440,9 +444,10 @@
 	Fireworks.prototype.explodeCore = function(pos, mag) {
 		if ( mag <= 0 )
 			return;
+		var fireworks = this;
 		var root = Math.sqrt(mag) / 3;
 		var vel = new Vector3(root, root, root);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; }
+		var cont = function(p) { fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; }
 		var numP = 2 + this.scaleParticleCount(mag / 20);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotate(Math.random() * 3, Math.random() * 3, Math.random() * 3);
@@ -475,8 +480,9 @@
 	Fireworks.prototype.explodeRaster = function(name, pos, mag) {
 		if ( mag <= 0 )
 			return;
+		var fireworks = this;
 		var root = Math.sqrt(mag);
-		var cont = function(p) { return --p.timer > 0 || Math.random() > 0.25; };
+		var cont = function(p) { fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; };
 		// convert raster into array of particles
 		var canvas = document.createElement("canvas");
 		var c = canvas.getContext("2d");
@@ -650,6 +656,7 @@
 		this.context.globalCompositeOperation = "lighter";
 		// Draw particles (unsorted because order is irrelevant in "lighter" mode)
 		//this.particles.sort(this.compareZPos);
+		this.timeDelta = Math.sqrt( this.frameRateMax / this.frameRate );
 		for (i = 0; i < this.particles.length; i++) {
 			// Periodically check whether the next frame is due.
 			if ( pushFrame ) // && i % 5 == 0 )
@@ -658,7 +665,7 @@
 			if ( this.particles[i].expendable && (i + this.tick) % this.burnoutMod == 0 ) {
 				this.particles[i].disable();
 			} else {
-				this.particles[i].update(i);
+				this.particles[i].update(this.timeDelta, i);
 				if ( this.particles[i].enabled )
 					this.draw3Din2D(this.particles[i]);
 			}
@@ -719,7 +726,8 @@
 		}
 		// The quality curve falls rapidly off the maximum. 90 => 0.81; 80 => 0.64; 50 => 0.25; 20 => 0.04
 		this.qualityScalar = Math.pow( this.renderQuality / 100, 2 );
-		this.frameInterval = parseInt( 1000 / this.scaleByQuality(this.frameRateMin, this.frameRateMax) );
+		this.frameRate = this.scaleByQuality(this.frameRateMin, this.frameRateMax);
+		this.frameInterval = parseInt( 1000 / this.frameRate );
 		this.particleDensity = this.scaleByQuality( this.particleDensityMin, this.particleDensityMax );
 		this.burnoutMod = parseInt( this.scaleByQuality( this.burnoutModMin, this.burnoutModMax ) );
 		this.stepInterval = parseInt( this.scaleByQuality( this.stepIntervalMin, this.stepIntervalMax ) );
@@ -729,12 +737,16 @@
 			this.showDebug();
 	};
 
+	Fireworks.prototype.decrementTimer = function(particle) {
+		particle.timer -= this.timeDelta;
+	};
+
 	Fireworks.prototype.showDebug = function() {
 		$(this.debugSelector).html(
 			"<table>"
 				+ $.map(
 					[["frameCache", (new Array(this.frameCache.length + 1)).join("|"), "frames"],
-					 ["frameRate", parseInt(1000 / this.frameInterval), "fps"],
+					 ["frameRate", parseInt(this.frameRate), "fps"],
 					 ["frameInterval", this.frameInterval, "ms"],
 					 ["latency", this.latency, "ms"],
 					 ["particles", (this.particles.length - this.spareParticles.length) + "/" + this.particles.length, "active/max"],
@@ -852,13 +864,17 @@
 			this.alpha = 1 - ( this.vel.z / this.vel.magnitude() * .75 );
 	};
 
-	Particle.prototype.update = function(i, cont) {
+	Particle.prototype.update = function(delta, i) {
 		if (this.enabled) {
-			if ( cont || this.cont(this) ) {
-				this.pos.plusEq(this.vel);
-				this.vel.multiplyEq((1 - this.fireworks.drag) * this.drag);
-				this.vel.y += this.fireworks.gravity * this.grav;
-				this.pos.x += this.fireworks.wind;
+			if ( this.cont(this) ) {
+				while ( delta > 0 ) {
+					var mult = delta >= 1 ? 1 : delta;
+					this.pos.plusEq(this.vel.copy().multiplyEq(mult));
+					this.vel.multiplyEq((1 - this.fireworks.drag * mult) * this.drag);
+					this.vel.y += this.fireworks.gravity * this.grav * mult;
+					this.pos.x += this.fireworks.wind * mult;
+					delta -= 1;
+				}
 				if ( typeof this.imgs == 'object' )
 					this.img = this.imgs[ i % this.imgs.length ];
 			} else {
