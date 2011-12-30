@@ -131,7 +131,7 @@
 
 	Fireworks.prototype.start = function() {
 		this.stopped = false;
-		this.frameDueTime = (new Date()).getTime() + 100;
+		this.frameDueTime = false;
 		var self = this;
 		this.timer = setInterval(function(){self.nextFrame()}, 1);
 		setTimeout(function(){self.render()}, 50);
@@ -345,7 +345,7 @@
 		do {
 			imgs.push(this.imgs.shell.random());
 		} while ( Math.random() > 0.7 );
-		var numP = this.scaleParticleCount(20 + mag * 2);
+		var numP = 10 + this.scaleParticleCount(mag * 2);
 		var myPos = new Vector3(pos.x, pos.y, pos.z);
 		// Spawn a symmetrical pair of particles at a time
 		for ( var i = 0; i < numP; i += 2 ) {
@@ -388,7 +388,7 @@
 		var rZ = 1 - 2 * Math.random();
 		var scale = 0.15 + Math.random() * 0.1;
 		var img = this.imgs.ring.random();
-		var numP = this.scaleParticleCount(mag);
+		var numP = 4 + this.scaleParticleCount(mag);
 		var myPos = new Vector3(pos.x, pos.y, pos.z);
 		for ( var i = 0; i < numP; ++i ) {
 			vel.rotateY(Math.random() * 3);
@@ -580,10 +580,11 @@
 		var frameStartTime = (new Date()).getTime();
 		var self = this;
 		if ( this.loading > 0 ) {
-			this.frameDueTime = (new Date()).getTime() + 100;
 			setTimeout(function(){self.render();}, 5);
 			return;
 		}
+		if ( this.frameDueTime === false )
+			this.frameDueTime = (new Date()).getTime() + 100;
 		if ( this.frameCache.length >= this.frameCacheSize ) {
 			this.nextFrame();
 			setTimeout(function(){self.render();}, 5);
@@ -599,8 +600,10 @@
 		}
 		this.nextFrame();
 		if ( this.tick >= this.lastStepTick + this.stepInterval ) {
-			for ( var i = 0; i < this.timeline[this.step].length; ++i )
+			for ( var i = 0; i < this.timeline[this.step].length; ++i ) {
 				this.launchRocket(i);
+				this.nextFrame();
+			}
 			this.step = ++this.step % this.timeline.length; // loop
 			this.lastStepTick = this.tick;
 		}
@@ -616,6 +619,7 @@
 		} else {
 			this.newCanvas();
 		}
+		this.nextFrame();
 		this.context.globalCompositeOperation = "lighter";
 		// Draw particles (unsorted because order is irrelevant in "lighter" mode)
 		//this.particles.sort(this.compareZPos);
@@ -633,7 +637,9 @@
 			}
 		}
 		this.context.globalAlpha = 1;
+		this.nextFrame();
 		this.drawSpotlights();
+		this.nextFrame();
 		if ( pushFrame )
 			this.frameCache.push( this.canvas );
 		this.nextFrame();
@@ -650,7 +656,7 @@
 	};
 
 	Fireworks.prototype.nextFrame = function() {
-		if ( this.stopped )
+		if ( this.stopped || !this.frameDueTime )
 			return;
 		var time = (new Date()).getTime();
 		var late = time - this.frameDueTime;
@@ -672,15 +678,16 @@
 	};
 
 	Fireworks.prototype.updateRenderQuality = function(late) {
-		var newQ = parseInt( this.frameCache.length / ( this.frameCacheSize - 2 ) * 100 );
-		if ( late > 5 )
-			this.renderQuality = Math.max( 1, this.renderQuality - Math.min(10, late) );
-		else if ( this.tick < 50 )
-			null;
-		else if ( newQ < this.renderQuality )
-			this.renderQuality = newQ;
-		else
-			this.renderQuality = Math.min( 100, this.renderQuality + Math.max( 0.2, (100 - this.renderQuality) / 50 ) );
+		if ( this.tick > 10 ) {
+			var newQ = ( this.frameCache.length + 1 ) / this.frameCacheSize * 100;
+			if ( this.tick > 50 && newQ < this.renderQuality ) {
+				this.renderQuality = newQ;
+			} if ( late > 5 ) {
+				this.renderQuality = Math.max( 1, this.renderQuality - Math.min(10, late) );
+			} else {
+				this.renderQuality = Math.min( 100, this.renderQuality + Math.max( 0.2, (100 - this.renderQuality) / 50 ) );
+			}
+		}
 		this.frameInterval = parseInt( 1000 / this.scaleByQuality(this.frameRateMin, this.frameRateMax) );
 		this.particleDensity = this.scaleByQuality( this.particleDensityMin, this.particleDensityMax );
 		this.burnoutMod = parseInt( this.scaleByQuality( 10, 100 ) );
