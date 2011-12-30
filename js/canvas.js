@@ -16,6 +16,7 @@
 	    sky    = "#0051A4",
 	    blue   = "#1010FF",
 	    yellow = "#FFFF00",
+	    faint  = "#202030",
 	    white  = "#FFFFFF";
 
 	var defaults = {
@@ -25,7 +26,7 @@
 		frameRateMax : 20,
 		frameInterval : 50, // ms between rendered frames
 		stepIntervalMin : 60,
-		stepIntervalMax : 20,
+		stepIntervalMax : 25,
 		stepInterval : 20, // ticks between timeline steps
 		rocketIntervalMin : 15,
 		rocketIntervalMax : 3,
@@ -48,7 +49,7 @@
 			logo      : "img/w.png"
 		},
 		spriteColors : {
-			rocket    : [white],
+			rocket    : [faint],
 			explosion : [yellow, white],
 			core      : [orange, yellow, blue, white, moss],
 			shell     : [green, red, orange, tan, green, white, white, white, sky, blue],
@@ -71,6 +72,7 @@
 		frameCache : [],
 		frameCacheIndex : 0,
 		startCallback : null,
+		rocketCallback : null,
 		burnoutMod : 100, // modulo for early burnout. higher number allows particles to last longer.
 		renderQuality : 100, // on a scale of 0-100
 		renderQualityAcc : 0,
@@ -311,7 +313,7 @@
 
 	Fireworks.prototype.launchRocket = function(data) {
 		var fireworks = this;
-		this.getParticle({
+		var rocket = this.getParticle({
 			scale: .15,
 			stretch: 5,
 			pos: new Vector3(Math.random() * 100 - 50, Math.random() * 3 + 190, Math.random() * 4 - 2),
@@ -338,6 +340,8 @@
 				return true;
 			}
 		});
+		if ( typeof this.rocketCallback == "function" )
+			this.rocketCallback.call(rocket);
 	};
 
 	Fireworks.prototype.explodeShell = function(pos, mag, op) {
@@ -585,11 +589,11 @@
 	Fireworks.prototype.nextTick = function() {
 		if ( this.rocket === false && this.tick >= this.lastStepTick + this.stepInterval )
 			this.rocket = 0;
-		if ( this.rocket !== false && this.tick >= this.lastRocketTick + this.rocketInterval ) {
+		while ( this.rocket !== false && this.tick >= this.lastRocketTick + this.rocketInterval ) {
 			var step = this.timeline[this.step];
 			if ( typeof step[this.rocket] == "object" ) {
 				this.launchRocket( step[this.rocket] );
-				this.lastRocketTick = this.tick;
+				this.lastRocketTick = this.tick - ( this.rocket % 3 );
 			}
 			++this.rocket;
 			if ( typeof step[this.rocket] == "undefined" ) {
