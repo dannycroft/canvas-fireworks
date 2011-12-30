@@ -21,22 +21,18 @@
 
 	var defaults = {
 		debug : true,
+		debugSelector : "#debug",
 		baseHref : "",
-		frameRateMin : 12.5,
+		frameRateMin : 8,
 		frameRateMax : 20,
-		frameInterval : 50, // ms between rendered frames
 		stepIntervalMin : 60,
-		stepIntervalMax : 25,
-		stepInterval : 20, // ticks between timeline steps
+		stepIntervalMax : 30,
 		rocketIntervalMin : 15,
 		rocketIntervalMax : 3,
-		rocketInterval : 3, // ticks between rockets in the same step
-		lastStepTick : 0, // tick of last timeline step
-		lastRocketTick : 0, // tick of last rocket step
 		frameCacheSize : 20, // number of frames to generate in advance
 		drag : 0.01, // velocity lost per frame
 		gravity : 0.5, // downward acceleration
-		wind : -0.2, // horizontal slide applied to everything each frame
+		wind : -0.1, // horizontal slide applied to everything each frame
 		sprites : { // images used in animation
 			rocket    : "img/electric.png",
 			explosion : "img/spark.png",
@@ -57,8 +53,22 @@
 			logo      : [blue, green, orange, sky]
 		},
 		fov : 500,
+		particleDensityMax : 2.00,
+		particleDensityMin : 0.25,
+		startCallback : null,
+		rocketCallback : null,
+		burnoutModMin : 5,
+		burnoutModMax : 100,
+	};
+
+	var vars = {
+		frameInterval : 50, // ms between rendered frames
+		stepInterval : 20, // ticks between timeline steps
+		rocketInterval : 3, // ticks between rockets in the same step
+		lastStepTick : 0, // tick of last timeline step
+		lastRocketTick : 0, // tick of last rocket step
 		imgs : {}, // loaded sprites
-		loading : 0,
+		loading : 0, // images not yet loaded from server
 		particles : [], // all particles ever created
 		spareParticles : [], // particles ready to be reused
 		tick : 0, // one per rendered frame
@@ -66,17 +76,14 @@
 		rocket : false, // index in the current step
 		timer : null, // from setInterval
 		stopped : false,
-		particleDensityMax : 2.00,
-		particleDensityMin : 0.25,
 		particleDensity : 1,
 		frameCache : [],
-		frameCacheIndex : 0,
-		startCallback : null,
-		rocketCallback : null,
+		latency : 0,
 		burnoutMod : 100, // modulo for early burnout. higher number allows particles to last longer.
 		renderQuality : 100, // on a scale of 0-100
 		renderQualityAcc : 0,
 		renderQualityCt : 0,
+		renderQualityAvg : 100
 	};
 
 	var methods = {
@@ -106,7 +113,7 @@
 	};
 
 	function Fireworks(options) {
-		$.extend(true, this, defaults, options); // Allow opts to override the defaults
+		$.extend(true, this, defaults, options, vars); // Allow opts to override the defaults
 		this.loadSprites(); // blocks animation while loading sprites
 	};
 
@@ -316,8 +323,8 @@
 		var rocket = this.getParticle({
 			scale: .15,
 			stretch: 5,
-			pos: new Vector3(Math.random() * 100 - 50, Math.random() * 3 + 190, Math.random() * 4 - 2),
-			vel: new Vector3(Math.random() * 12 - 6, Math.random() * 6 - 20, Math.random() * 6 - 3),
+			pos: new Vector3(Math.random() * 100 - 50, 260, Math.random() * 4 - 2),
+			vel: new Vector3(Math.random() * 10 - 5, Math.random() * 6 - 23, Math.random() * 6 - 3),
 			img: this.imgs.rocket.random(),
 			data: data,
 			expendable: false,
@@ -335,13 +342,13 @@
 				particle.vel = new Vector3(0, 0, 0);
 				particle.grav = 0.1;
 				var x = Math.max(Math.sqrt(particle.data[0]) / 20, 0.25);
-				particle.scales = [2,4,5,5,4,4,3,3,2,2,0].map(function(s){return s*x;});
+				particle.scales = [2,4,6,5,4,3,2,0].map(function(s){return s*x;});
 				particle.cont = function(particle) { return particle.scale = particle.scales.shift(); };
 				return true;
 			}
 		});
 		if ( typeof this.rocketCallback == "function" )
-			this.rocketCallback.call(rocket);
+			this.rocketCallback.call(this, rocket);
 	};
 
 	Fireworks.prototype.explodeShell = function(pos, mag, op) {
@@ -477,7 +484,7 @@
 		c.drawImage(raster, 0, 0, raster.width, raster.height);
 		var imageData = id = c.getImageData(0, 0, raster.width, raster.height);
 		var i = 0, halfx = raster.width / 2, halfy = raster.height / 2, x, y, vx, vy;
-		var rx = Math.random() - 0.5, ry = Math.random() - 0.5, rz = Math.random() - 0.5;
+		var rx = Math.random() - 0.3, ry = Math.random() - 0.3, rz = Math.random() - 0.3;
 		var img = this.imgs[name].random();
 		for ( var row = 0; row < raster.height; ++row ) {
 			y = row - halfy;
@@ -506,7 +513,7 @@
 	};
 
 	Fireworks.prototype.scaleByQuality = function(min, max) {
-		return min + this.renderQuality * ( max - min ) / 100;
+		return min + this.qualityScalar * ( max - min );
 	};
 
 	Fireworks.prototype.getParticle = function(opts) {
@@ -523,7 +530,6 @@
 	};
 
 	Fireworks.prototype.drawSpotlights = function() {
-		// Draw some spotlights on the sky
 		this.context.beginPath();
 		this.context.moveTo(Math.floor(this.canvas.width / 3), this.canvas.height);
 		this.context.lineTo(Math.floor(this.canvas.width / 2 + 200 * Math.sin(this.tick / 19)), 0);
@@ -665,8 +671,6 @@
 			this.frameCache.push( this.canvas );
 		this.nextFrame();
 		setTimeout(function(){self.render();}, 1);
-		this.renderQualityAcc += this.renderQuality;
-		this.renderQualityCt += 1;
 	};
 
 	Fireworks.prototype.fadeFrame = function() {
@@ -684,13 +688,11 @@
 		// Better to render a tiny bit early than very late.
 		if ( late < -2 )
 			return;
-		if ( this.debug ) $("#debug").html("frameCache " + (new Array(this.frameCache.length + 1)).join("|"));
-		if ( this.debug ) $("#debug2").html("latency " + Math.max(0, late) + "ms");
+		this.latency = Math.max(0, late);
 		if ( this.frameCache.length == 0 )
 			return;
 		// Slow and simplify the animation when the cache is thin
-		this.updateRenderQuality(late);
-		if ( this.debug ) $("#debug3").html("frameInterval " + this.frameInterval + "<br>density " + this.particleDensity + "<br>burnout " + this.burnoutMod + "<br>stepInterval " + this.stepInterval + "<br>rocketInterval " + this.rocketInterval + "<br>renderQuality " + this.renderQuality + "<br>avgRenderQuality " + (this.renderQualityAcc/this.renderQualityCt));
+		this.updateRenderQuality();
 		this.fadeFrame();
 		// Add the next frame
 		this.displayContext.globalCompositeOperation = "lighter";
@@ -698,22 +700,54 @@
 		this.frameDueTime = time + this.frameInterval - Math.min(late, 10);
 	};
 
-	Fireworks.prototype.updateRenderQuality = function(late) {
+	Fireworks.prototype.updateRenderQuality = function() {
+		this.renderQualityAcc += this.renderQuality;
+		this.renderQualityCt += 1;
+		this.renderQualityAvg = this.renderQualityAcc / this.renderQualityCt;
 		if ( this.tick > 10 ) {
-			var newQ = ( this.frameCache.length + 1 ) / this.frameCacheSize * 100;
+			var newQ = ( this.frameCache.length * 1.25 ) / this.frameCacheSize * 100;
 			if ( this.tick > 50 && newQ < this.renderQuality ) {
 				this.renderQuality = newQ;
-			} if ( late > 5 ) {
-				this.renderQuality = Math.max( 1, this.renderQuality - Math.min(10, late) );
+			} if ( this.latency > this.frameInterval / 8 ) {
+				this.renderQuality = Math.max( 1, this.renderQuality - Math.min(10, this.latency) );
 			} else {
-				this.renderQuality = Math.min( 100, this.renderQuality + Math.max( 0.2, (100 - this.renderQuality) / 100 ) );
+				if ( this.renderQualityAvg > this.renderQuality )
+					this.renderQuality += Math.max( 0.1, ( ( 100 + this.renderQualityAvg ) / 2 - this.renderQuality ) / 50 );
+				else
+					this.renderQuality = Math.min( 100, this.renderQuality + 0.1 );
 			}
 		}
+		// The quality curve falls rapidly off the maximum. 90 => 0.81; 80 => 0.64; 50 => 0.25; 20 => 0.04
+		this.qualityScalar = Math.pow( this.renderQuality / 100, 2 );
 		this.frameInterval = parseInt( 1000 / this.scaleByQuality(this.frameRateMin, this.frameRateMax) );
 		this.particleDensity = this.scaleByQuality( this.particleDensityMin, this.particleDensityMax );
-		this.burnoutMod = parseInt( this.scaleByQuality( 10, 100 ) );
+		this.burnoutMod = parseInt( this.scaleByQuality( this.burnoutModMin, this.burnoutModMax ) );
 		this.stepInterval = parseInt( this.scaleByQuality( this.stepIntervalMin, this.stepIntervalMax ) );
 		this.rocketInterval = parseInt( this.scaleByQuality( this.rocketIntervalMin, this.rocketIntervalMax ) );
+
+		if ( this.debug )
+			this.showDebug();
+	};
+
+	Fireworks.prototype.showDebug = function() {
+		$(this.debugSelector).html(
+			"<table>"
+				+ $.map(
+					[["frameCache", (new Array(this.frameCache.length + 1)).join("|"), "frames"],
+					 ["frameRate", parseInt(1000 / this.frameInterval), "fps"],
+					 ["frameInterval", this.frameInterval, "ms"],
+					 ["latency", this.latency, "ms"],
+					 ["particles", (this.particles.length - this.spareParticles.length) + "/" + this.particles.length, "active/max"],
+					 ["particleDensity", parseInt(this.particleDensity * 50), "%"],
+					 ["burnoutRate", parseInt(100 / this.burnoutMod), "%"],
+					 ["stepInterval", this.stepInterval, "frames"],
+					 ["rocketInterval", this.rocketInterval, "frames"],
+					 ["renderQuality", parseInt(this.renderQuality * 100) / 100, "%"],
+					 ["renderQualityAvg", parseInt(this.renderQualityAvg * 100) / 100, "%"]
+					],
+					function(d) { return "<tr><td>" + d[0] + "</td><td style='text-align:right;width:5em'>" + d[1] + "</td><td>" + d[2] + "</td></tr>"; }
+				).join("")
+				+ "</table>");
 	};
 
 	Fireworks.prototype.compareZPos = function(a, b) {
