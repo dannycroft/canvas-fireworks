@@ -33,6 +33,7 @@
 		drag : 0.01, // velocity lost per frame
 		gravity : 0.5, // downward acceleration
 		wind : -0.1, // horizontal slide applied to everything each frame
+		preload : [], // URLs to load before allowing animation to start
 		sprites : { // images used in animation
 			rocket    : "img/electric.png",
 			explosion : "img/spark.png",
@@ -154,6 +155,14 @@
 		this.stopped = false;
 		this.frameDueTime = false;
 		var self = this;
+		if ( this.preload.length ) {
+			$.map(this.preload, function(url) {
+				++self.loading;
+				var img = new Image();
+				img.src = self.applyBaseHref(url);
+				img.onload = function() { --self.loading; };
+			});
+		}
 		this.timer = setInterval(function(){self.nextFrame()}, 1);
 		setTimeout(function(){self.render()}, 50);
 		return this;
@@ -255,12 +264,18 @@
 		return rgbToHsv.apply({}, hexToRgb(hex));
 	}
 
+	Fireworks.prototype.applyBaseHref = function(url) {
+		if ( !url.match(/^\//) )
+			url = this.baseHref + url;
+		return url;
+	};
+
 	Fireworks.prototype.loadSprites = function() {
 		var self = this;
 		$.each(this.sprites, function(name, url) {
 			++self.loading;
 			var img = new Image();
-			img.src = self.baseHref + url;
+			img.src = self.applyBaseHref(url);
 			img.onload = function() {
 				if ( typeof self.imgs[name] != "object" )
 					self.imgs[name] = [];
@@ -271,7 +286,7 @@
 		$.each(this.rasters, function(name, url) {
 			++self.loading;
 			self.rasters[name] = new Image();
-			self.rasters[name].src = self.baseHref + url;
+			self.rasters[name].src = self.applyBaseHref(url);
 			self.rasters[name].onload = function() {
 				--self.loading;
 			};
