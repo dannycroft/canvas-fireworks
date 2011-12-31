@@ -16,11 +16,11 @@
 	    sky    = "#0051A4",
 	    blue   = "#1010FF",
 	    yellow = "#FFFF00",
-	    faint  = "#202030",
+	    faint  = "#404060",
 	    white  = "#FFFFFF";
 
 	var defaults = {
-		debug : true,
+		debug : false,
 		debugSelector : "#debug",
 		baseHref : "",
 		frameRateMin : 8,
@@ -56,14 +56,16 @@
 		particleDensityMax : 2.00,
 		particleDensityMin : 0.25,
 		startCallback : null,
-		rocketCallback : null,
+		stepCallback : null,
 		burnoutModMin : 5,
 		burnoutModMax : 100,
+		delayTimeline : false
 	};
 
 	var vars = {
 		frameRate : 20, // frames per second
 		frameInterval : 50, // ms between rendered frames
+		frameStartTime : null,
 		timeDelta : 1, // time elapsed per frame
 		stepInterval : 20, // ticks between timeline steps
 		rocketInterval : 3, // ticks between rockets in the same step
@@ -80,12 +82,14 @@
 		stopped : false,
 		particleDensity : 1,
 		frameCache : [],
+		stepCache : [],
 		latency : 0,
 		burnoutMod : 100, // modulo for early burnout. higher number allows particles to last longer.
 		renderQuality : 100, // on a scale of 0-100
 		renderQualityAcc : 0,
 		renderQualityCt : 0,
-		renderQualityAvg : 100
+		renderQualityAvg : 100,
+		startTime : null
 	};
 
 	var methods = {
@@ -322,11 +326,11 @@
 
 	Fireworks.prototype.launchRocket = function(data) {
 		var fireworks = this;
-		var rocket = this.getParticle({
+		this.getParticle({
 			scale: .15,
-			stretch: 5,
+			streak: 5,
 			pos: new Vector3(Math.random() * 100 - 50, 260, Math.random() * 4 - 2),
-			vel: new Vector3(Math.random() * 10 - 5, Math.random() * 6 - 23, Math.random() * 6 - 3),
+			vel: new Vector3(Math.random() * 10 - 5, Math.random() * 5 - 23, Math.random() * 3),
 			img: this.imgs.rocket.random(),
 			data: data,
 			expendable: false,
@@ -335,7 +339,7 @@
 				if ( particle.vel.y < -1.5 )
 					return true;
 				// Spawn explosions
-				particle.stretch = false;
+				particle.streak = false;
 				fireworks.explodeCore(particle.pos, particle.data[0]);
 				fireworks.explodeShell(particle.pos, particle.data[1], particle);
 				fireworks.explodeRing(particle.pos, particle.data[2], particle);
@@ -349,8 +353,6 @@
 				return true;
 			}
 		});
-		if ( typeof this.rocketCallback == "function" )
-			this.rocketCallback.call(this, rocket);
 	};
 
 	Fireworks.prototype.explodeShell = function(pos, mag, op) {
@@ -360,7 +362,7 @@
 		var root = Math.sqrt(mag) + 1;
 		var vel = new Vector3(root, root, root);
 		var scale = 0.15 + Math.random() * 0.1;
-		var cont = function(p) { p.stretch = 6; fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; }
+		var cont = function(p) { p.streak = 6; fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; }
 		var imgs = [];
 		do {
 			imgs.push(this.imgs.shell.random());
@@ -379,7 +381,7 @@
 				drag: 0.92,
 				cont: cont,
 				img: imgs.random(),
-				timer: 23,
+				timer: 21,
 				x2d: op.x2d,
 				y2d: op.y2d
 			});
@@ -391,7 +393,7 @@
 				drag: 0.91,
 				cont: cont,
 				img: imgs.random(),
-				timer: 23,
+				timer: 21,
 				x2d: op.x2d,
 				y2d: op.y2d
 			});
@@ -404,7 +406,7 @@
 		var fireworks = this;
 		var root = Math.sqrt(mag) * 0.8 + 1;
 		var vel = new Vector3(root, 0, root);
-		var cont = function(p) { p.stretch = 8; fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; }
+		var cont = function(p) { p.streak = 8; fireworks.decrementTimer(p); return p.timer > 0 || Math.random() > 0.25; }
 		var rX = 1 - 2 * Math.random();
 		var rZ = 1 - 2 * Math.random();
 		var scale = 0.15 + Math.random() * 0.1;
@@ -422,7 +424,7 @@
 				cont: cont,
 				img: img,
 				scale: scale,
-				timer: 23,
+				timer: 20,
 				x2d: op.x2d,
 				y2d: op.y2d
 			});
@@ -434,7 +436,7 @@
 				cont: cont,
 				img: img,
 				scale: scale,
-				timer: 23,
+				timer: 20,
 				x2d: op.x2d,
 				y2d: op.y2d
 			});
@@ -490,7 +492,7 @@
 		c.drawImage(raster, 0, 0, raster.width, raster.height);
 		var imageData = id = c.getImageData(0, 0, raster.width, raster.height);
 		var i = 0, halfx = raster.width / 2, halfy = raster.height / 2, x, y, vx, vy;
-		var rx = Math.random() - 0.3, ry = Math.random() - 0.3, rz = Math.random() - 0.3;
+		var rx = Math.random() / 2 - 0.25, ry = Math.random() / 2 - 0.25, rz = Math.random() / 2 - 0.25;
 		var img = this.imgs[name].random();
 		for ( var row = 0; row < raster.height; ++row ) {
 			y = row - halfy;
@@ -561,7 +563,7 @@
 
 	Fireworks.prototype.draw3Din2D = function(particle) {
 		if ( particle.scale > 0 ) {
-			var mult = 6;
+			var mult = 6; // magic number
 			var scale = this.fov / ( this.fov + particle.pos.z );
 			var x2d = ( particle.pos.x * scale) + this.w2;
 			var y2d = ( particle.pos.y * scale) + this.h2;
@@ -575,7 +577,7 @@
 			this.context.translate( x2d, y2d ); // 5: move the particle into position
 			this.context.scale(scale, scale); // 4: scale for distance (pos.z)
 			// Motion blur
-			if ( particle.stretch && !this.isMouseDown ) {
+			if ( particle.streak && !this.isMouseDown ) {
 				var dx = x2d - particle.x2d;
 				var dy = y2d - particle.y2d;
 				var angle = Math.atan2( dy, dx );
@@ -584,7 +586,7 @@
 				var distance = Math.sqrt( Math.pow( dx, 2 ) + Math.pow( dy, 2 ) );
 				this.context.rotate(angle); // 3: rotate to direction of motion
 				this.context.translate(- distance / 2, 0); // 2: move center backward along direction of motion
-				this.context.scale(1 + distance / mult * particle.stretch, 1); // 1: scale by 2d projected distance
+				this.context.scale(1 + distance / mult * particle.streak, 1); // 1: scale by 2d projected distance
 			}
 			this.context.globalAlpha = particle.alpha;
 			// draw image centered at origin
@@ -592,15 +594,26 @@
 			this.context.drawImage(particle.img, - scaleMult, - scaleMult, 2 * scaleMult, 2 * scaleMult);
 			// reset to identity matrix
 			this.context.setTransform(1, 0, 0, 1, 0, 0);
-			// save 2D projection coords for stretch
+			// save 2D projection coords for streak
 			particle.x2d = x2d;
 			particle.y2d = y2d;
 		}
 	};
 
 	Fireworks.prototype.nextTick = function() {
-		if ( this.rocket === false && this.tick >= this.lastStepTick + this.stepInterval )
+		var inDelay = false;
+		if ( this.delayTimeline > 0 ) {
+			if ( this.frameStartTime < this.startTime + this.delayTimeline )
+				inDelay = true;
+			else
+				this.delayTimeline = false;
+		}
+		if ( !inDelay && this.rocket === false && this.tick >= this.lastStepTick + this.stepInterval ) {
 			this.rocket = 0;
+			this.stepCache.push( this.step );
+		} else {
+			this.stepCache.push( false );
+		}
 		while ( this.rocket !== false && this.tick >= this.lastRocketTick + this.rocketInterval ) {
 			var step = this.timeline[this.step];
 			if ( typeof step[this.rocket] == "object" ) {
@@ -618,7 +631,7 @@
 	};
 
 	Fireworks.prototype.render = function() {
-		var frameStartTime = (new Date()).getTime();
+		this.frameStartTime = (new Date()).getTime();
 		var self = this;
 		if ( this.loading > 0 ) {
 			setTimeout(function(){self.render();}, 5);
@@ -632,23 +645,25 @@
 			return;
 		}
 		if ( typeof this.startCallback == "function" ) {
-			var delay = parseInt(this.startCallback.call());
+			var delay = parseInt(this.startCallback.call(this));
 			this.startCallback = null;
 			if ( delay > 0 ) {
 				setTimeout(function(){self.render();}, delay);
 				return;
 			}
 		}
+		if ( this.startTime === null )
+			this.startTime = this.frameStartTime;
 		this.nextFrame();
 		this.nextTick();
 		// If the frame we're drawing is already late then skip the cache.
 		var pushFrame = true;
-		if ( this.frameCache.length == 0 && frameStartTime >= this.frameDueTime ) {
+		if ( this.frameCache.length == 0 && this.frameStartTime >= this.frameDueTime ) {
 			pushFrame = false;
 			this.canvas = this.displayCanvas;
 			this.context = this.displayContext;
 			this.fadeFrame();
-			this.frameDueTime = frameStartTime + this.frameInterval;
+			this.frameDueTime = this.frameStartTime + this.frameInterval;
 		} else {
 			this.newCanvas();
 		}
@@ -674,10 +689,22 @@
 		this.nextFrame();
 		this.drawSpotlights();
 		this.nextFrame();
-		if ( pushFrame )
+		if ( pushFrame ) {
 			this.frameCache.push( this.canvas );
+		} else {
+			this.doStepCallback();
+		}
+
 		this.nextFrame();
 		setTimeout(function(){self.render();}, 1);
+	};
+
+	Fireworks.prototype.doStepCallback = function() {
+		var step = this.stepCache.shift();
+		if ( step !== false ) {
+			if ( typeof this.stepCallback == "function" )
+				this.stepCallback.call(this, step);
+		}
 	};
 
 	Fireworks.prototype.fadeFrame = function() {
@@ -704,6 +731,7 @@
 		// Add the next frame
 		this.displayContext.globalCompositeOperation = "lighter";
 		this.displayContext.drawImage( this.frameCache.shift(), 0, 0 );
+		this.doStepCallback();
 		this.frameDueTime = time + this.frameInterval - Math.min(late, 10);
 	};
 
@@ -732,7 +760,6 @@
 		this.burnoutMod = parseInt( this.scaleByQuality( this.burnoutModMin, this.burnoutModMax ) );
 		this.stepInterval = parseInt( this.scaleByQuality( this.stepIntervalMin, this.stepIntervalMax ) );
 		this.rocketInterval = parseInt( this.scaleByQuality( this.rocketIntervalMin, this.rocketIntervalMax ) );
-
 		if ( this.debug )
 			this.showDebug();
 	};
@@ -751,13 +778,13 @@
 					 ["latency", this.latency, "ms"],
 					 ["particles", (this.particles.length - this.spareParticles.length) + "/" + this.particles.length, "active/max"],
 					 ["particleDensity", parseInt(this.particleDensity * 50), "%"],
-					 ["burnoutRate", parseInt(100 / this.burnoutMod), "%"],
+					 ["particleBurnout", "1/" + parseInt(this.burnoutMod), "per frame"],
 					 ["stepInterval", this.stepInterval, "frames"],
 					 ["rocketInterval", this.rocketInterval, "frames"],
 					 ["renderQuality", parseInt(this.renderQuality * 100) / 100, "%"],
 					 ["renderQualityAvg", parseInt(this.renderQualityAvg * 100) / 100, "%"]
 					],
-					function(d) { return "<tr><td>" + d[0] + "</td><td style='text-align:right;width:5em'>" + d[1] + "</td><td>" + d[2] + "</td></tr>"; }
+					function(d) { return "<tr><td>" + d[0] + "</td><td style='text-align:right;width:6em'>" + d[1] + "</td><td>" + d[2] + "</td></tr>"; }
 				).join("")
 				+ "</table>");
 	};
@@ -848,7 +875,7 @@
 		scale: 1,
 		x2d: false,
 		y2d: false,
-		stretch: false,
+		streak: false,
 		imgs: false,
 		expendable: true,
 		alpha: 1,
