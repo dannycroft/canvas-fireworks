@@ -54,6 +54,11 @@
 			ring      : [red, orange, white, sky, tan],
 			logo      : [blue, green, orange, sky]
 		},
+		spotlightColors : [
+			"#050528",
+			"#0F051E",
+			"#050F1E"
+		],
 		fov : 500,
 		particleDensityMax : 2.00,
 		particleDensityMin : 0.25,
@@ -122,8 +127,8 @@
 
 	function Fireworks(options) {
 		$.extend(this, defaults, options, vars); // Allow opts to override the defaults
-		var rgb = hexToRgb(this.bgFillColor);
-		this.bgFillStyle = "rgba("+rgb[0]+","+rgb[1]+","+rgb[2]+",0.25)";
+		this.bgFillStyle = "rgba("+hexToRgb(this.bgFillColor)+",0.25)";
+		this.spotlightStyles = this.spotlightColors.map(function(c){return "rgba("+hexToRgb(c)+",0.2)"});
 		this.loadSprites(); // blocks animation while loading sprites
 	};
 
@@ -561,21 +566,21 @@
 		this.context.lineTo(Math.floor(this.canvas.width / 2 + 200 * Math.sin(this.tick / 19)), 0);
 		this.context.lineTo(Math.floor(this.canvas.width / 2 + 200 * Math.sin(this.tick / 19) + 100), 0);
 		this.context.lineTo(Math.floor(this.canvas.width / 3 + 15), this.canvas.height);
-		this.context.fillStyle = "rgba(5,5,40,0.2)";
+		this.context.fillStyle = this.spotlightStyles[0];
 		this.context.fill();
 		this.context.beginPath();
 		this.context.moveTo(Math.floor(2 * this.canvas.width / 3), this.canvas.height);
 		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 23)) - 100, 0);
 		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 23)), 0);
 		this.context.lineTo(Math.floor(2 * this.canvas.width / 3 + 15), this.canvas.height);
-		this.context.fillStyle = "rgba(15,5,30,0.2)";
+		this.context.fillStyle = this.spotlightStyles[1];
 		this.context.fill();
 		this.context.beginPath();
 		this.context.moveTo(Math.floor(2 * this.canvas.width / 3) + 40, this.canvas.height);
 		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 29)) - 100, 0);
 		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 29)), 0);
 		this.context.lineTo(Math.floor(2 * this.canvas.width / 3) + 55, this.canvas.height);
-		this.context.fillStyle = "rgba(5,15,30,0.2)";
+		this.context.fillStyle = this.spotlightStyles[2];
 		this.context.fill();
 	};
 
