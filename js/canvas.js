@@ -20,6 +20,7 @@
 	    white  = "#FFFFFF";
 
 	var defaults = {
+		bgFillColor : "#000000",
 		debug : false,
 		debugSelector : "#debug",
 		baseHref : "",
@@ -120,7 +121,9 @@
 	};
 
 	function Fireworks(options) {
-		$.extend(true, this, defaults, options, vars); // Allow opts to override the defaults
+		$.extend(this, defaults, options, vars); // Allow opts to override the defaults
+		var rgb = hexToRgb(this.bgFillColor);
+		this.bgFillStyle = "rgba("+rgb[0]+","+rgb[1]+","+rgb[2]+",0.25)";
 		this.loadSprites(); // blocks animation while loading sprites
 	};
 
@@ -725,7 +728,7 @@
 	Fireworks.prototype.fadeFrame = function() {
 		// Fade the previous frame
 		this.displayContext.globalCompositeOperation = "source-over";
-		this.displayContext.fillStyle = "rgba(0,0,0,0.25)";
+		this.displayContext.fillStyle = this.bgFillStyle;
 		this.displayContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
 	};
 
