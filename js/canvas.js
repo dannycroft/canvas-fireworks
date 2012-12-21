@@ -61,6 +61,7 @@
 			"#050F1E"
 		],
 		fov : 500,
+		pxScale: 1,
 		particleDensityMax : 2.00,
 		particleDensityMin : 0.25,
 		startCallback : null,
@@ -135,10 +136,10 @@
 	Fireworks.prototype.initCanvas = function(canvas) {
 		// This is the canvas that the user sees.
 		this.displayCanvas = canvas;
-		this.displayCanvas.width = this.displayCanvas.clientWidth;
-		this.displayCanvas.height = this.displayCanvas.clientHeight;
-		this.w2 = this.displayCanvas.width / 2;
-		this.h2 = this.displayCanvas.height / 2;
+		this.displayCanvas.width = this.displayCanvas.clientWidth * this.pxScale;
+		this.displayCanvas.height = this.displayCanvas.clientHeight * this.pxScale;
+		this.w2 = this.displayCanvas.clientWidth / 2;
+		this.h2 = this.displayCanvas.clientHeight / 2;
 		this.displayContext = this.displayCanvas.getContext("2d");
 
 		// This canvas holds the background.
@@ -586,23 +587,23 @@
 	Fireworks.prototype.drawSpotlights = function() {
 		this.context.beginPath();
 		this.context.moveTo(Math.floor(this.canvas.width / 3), this.canvas.height);
-		this.context.lineTo(Math.floor(this.canvas.width / 2 + 200 * Math.sin(this.tick / 19)), 0);
-		this.context.lineTo(Math.floor(this.canvas.width / 2 + 200 * Math.sin(this.tick / 19) + 100), 0);
-		this.context.lineTo(Math.floor(this.canvas.width / 3 + 15), this.canvas.height);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + this.pxScale * 200 * Math.sin(this.tick / 19)), 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + this.pxScale * (200 * Math.sin(this.tick / 19) + 100)), 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 3 + this.pxScale * 15), this.canvas.height);
 		this.context.fillStyle = this.spotlightStyles[0];
 		this.context.fill();
 		this.context.beginPath();
 		this.context.moveTo(Math.floor(2 * this.canvas.width / 3), this.canvas.height);
-		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 23)) - 100, 0);
-		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 23)), 0);
-		this.context.lineTo(Math.floor(2 * this.canvas.width / 3 + 15), this.canvas.height);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + this.pxScale * (180 * Math.sin(this.tick / 23) - 100)), 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + this.pxScale * 180 * Math.sin(this.tick / 23)), 0);
+		this.context.lineTo(Math.floor(2 * this.canvas.width / 3 + this.pxScale * 15), this.canvas.height);
 		this.context.fillStyle = this.spotlightStyles[1];
 		this.context.fill();
 		this.context.beginPath();
-		this.context.moveTo(Math.floor(2 * this.canvas.width / 3) + 40, this.canvas.height);
-		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 29)) - 100, 0);
-		this.context.lineTo(Math.floor(this.canvas.width / 2 + 180 * Math.sin(this.tick / 29)), 0);
-		this.context.lineTo(Math.floor(2 * this.canvas.width / 3) + 55, this.canvas.height);
+		this.context.moveTo(Math.floor(2 * this.canvas.width / 3) + this.pxScale * 40, this.canvas.height);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + this.pxScale * (180 * Math.sin(this.tick / 29) - 100)), 0);
+		this.context.lineTo(Math.floor(this.canvas.width / 2 + this.pxScale * 180 * Math.sin(this.tick / 29)), 0);
+		this.context.lineTo(Math.floor(2 * this.canvas.width / 3) + this.pxScale * 55, this.canvas.height);
 		this.context.fillStyle = this.spotlightStyles[2];
 		this.context.fill();
 	};
@@ -611,16 +612,16 @@
 		if ( particle.scale > 0 ) {
 			var mult = 6; // magic number
 			var scale = this.fov / ( this.fov + particle.pos.z );
-			var x2d = ( particle.pos.x * scale) + this.w2;
-			var y2d = ( particle.pos.y * scale) + this.h2;
+			var x2d = this.pxScale * (( particle.pos.x * scale) + this.w2);
+			var y2d = this.pxScale * (( particle.pos.y * scale) + this.h2);
 			if ( particle.x2d === false ) {
 				// If particle was just spawned, estimate the previous postion for blur
 				var scaleOld = this.fov / ( this.fov + particle.pos.z - particle.vel.z );
-				particle.x2d = ( particle.pos.x - particle.vel.x ) * scaleOld + this.w2;
-				particle.y2d = ( particle.pos.y - particle.vel.y ) * scaleOld + this.h2;
+				particle.x2d = this.pxScale * (( particle.pos.x - particle.vel.x ) * scaleOld + this.w2);
+				particle.y2d = this.pxScale * (( particle.pos.y - particle.vel.y ) * scaleOld + this.h2);
 			}
 			// Think of transforms as LIFO: the first one called is the last one applied.
-			this.context.translate( x2d, y2d ); // 5: move the particle into position
+			this.context.translate(x2d, y2d); // 5: move the particle into position
 			this.context.scale(scale, scale); // 4: scale for distance (pos.z)
 			// Motion blur
 			if ( particle.streak && !this.isMouseDown ) {
@@ -636,7 +637,7 @@
 			}
 			this.context.globalAlpha = particle.alpha;
 			// draw image centered at origin
-			var scaleMult = particle.scale * mult;
+			var scaleMult = particle.scale * mult * this.pxScale;
 			this.context.drawImage(particle.img, - scaleMult, - scaleMult, 2 * scaleMult, 2 * scaleMult);
 			// reset to identity matrix
 			this.context.setTransform(1, 0, 0, 1, 0, 0);
