@@ -21,6 +21,7 @@
 
 	var defaults = {
 		bgFillColor : "#000000",
+		bgImage : false,
 		debug : false,
 		debugSelector : "#debug",
 		baseHref : "",
@@ -127,7 +128,6 @@
 
 	function Fireworks(options) {
 		$.extend(this, defaults, options, vars); // Allow opts to override the defaults
-		this.bgFillStyle = "rgba("+hexToRgb(this.bgFillColor)+",0.25)";
 		this.spotlightStyles = this.spotlightColors.map(function(c){return "rgba("+hexToRgb(c)+",0.2)"});
 		this.loadSprites(); // blocks animation while loading sprites
 	};
@@ -141,6 +141,29 @@
 		this.h2 = this.displayCanvas.height / 2;
 		this.displayContext = this.displayCanvas.getContext("2d");
 
+		// This canvas holds the background.
+		this.bgCanvas = document.createElement("canvas");
+		this.bgCanvas.width = this.displayCanvas.width;
+		this.bgCanvas.height = this.displayCanvas.height;
+		this.bgContext = this.bgCanvas.getContext("2d");
+		if ( this.bgFillColor ) {
+			this.bgContext.fillStyle = "rgba("+hexToRgb(this.bgFillColor)+",1)";
+			this.bgContext.fillRect(0, 0, this.bgCanvas.width, this.bgCanvas.height);
+		}
+		if ( this.bgImage ) {
+			// Todo: stretch to fit
+			var bg = new Image();
+			++this.loading;
+			var self = this;
+			bg.onload = function() {
+				--self.loading;
+				self.bgContext.drawImage(bg, 0, 0, self.bgCanvas.width, self.bgCanvas.height);
+				self.fadeFrame();
+			};
+			bg.src = this.applyBaseHref(this.bgImage);
+		} else {
+			this.fadeFrame();
+		}
 /*
 		var self = this;
 		$(canvas).bind('mousedown.fireworks', function() {self.isMouseDown = true;});
@@ -733,8 +756,8 @@
 	Fireworks.prototype.fadeFrame = function() {
 		// Fade the previous frame
 		this.displayContext.globalCompositeOperation = "source-over";
-		this.displayContext.fillStyle = this.bgFillStyle;
-		this.displayContext.fillRect(0, 0, this.canvas.width, this.canvas.height);
+		this.displayContext.globalAlpha = 0.4;
+		this.displayContext.drawImage(this.bgCanvas, 0, 0, this.displayCanvas.width, this.displayCanvas.height);
 	};
 
 	Fireworks.prototype.nextFrame = function() {
@@ -753,6 +776,7 @@
 		this.fadeFrame();
 		// Add the next frame
 		this.displayContext.globalCompositeOperation = "lighter";
+		this.displayContext.globalAlpha = 1;
 		this.displayContext.drawImage( this.frameCache.shift(), 0, 0 );
 		this.doStepCallback();
 		this.frameDueTime = time + this.frameInterval - Math.min(late, 10);
