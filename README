@@ -1,1 +1,30 @@
 HTML5 Canvas experiment. Creating fireworks with 2D/3D particles.
+
+
+
+## History
+
+The WordPress.com Data Team was getting ready to send out yearly reports. The fireworks theme was chosen because the reports go out around New Years, and because fireworks are exciting and they can be "choreographed" to a timeline. (I once saw a fireworks show that was purported to follow a piece of music but the sound delay obscured the synchronicity.)
+
+The timeline aspect makes the fireworks show into something of a graph. We proceed through the year, showing each event's relative impact by scaling the different shapes that compose an explosion: the core, shell and ring. The exact parameters would be chosen to make every graph exciting while allowing the most impressive timelines to distinguish themselves.
+
+In the WordPress.com case, the parameters of the explosions are page views, comments, likes. Early in the project these were mapped respectively to core, shell, ring. When certain blogs were found to lack one or two of these parameters, it was decided to shuffle the mapping so that the shapes would be randomly distributed.
+
+This project was forked from Danny Croft's [Canvas Fireworks](http://dannycroft.co.uk/lab/canvas-fireworks/) because a quick Google scan found that to be the best physics-based fireworks prototype available. Development proceeded exclusively in Chrome for many iterations. The simple particle fountain was replaced with rockets that fired on a timeline and exploded into different shapes and sizes. A color shifting system was devised to allow changes to the color scheme to be as simple as editing CSS colors.
+
+The fireworks only started to look like the real thing after I was browsing the HTML5 Canvas spec and noticed that it supported several [compositing operations](http://www.whatwg.org/specs/web-apps/current-work/multipage/the-canvas-element.html#dom-context-2d-globalcompositeoperation). Having fiddled with additive compositing in Photoshop without finding any use for it, I was curious what the "lighter" mode would do. It was a [magical discovery](https://github.com/Automattic/canvas-fireworks/commit/46c63c92ee4c015e0d81c599c902fbf10686c910). Mimicking the way the human eye perceives very bright light, this additive mode turned the particles white where they were the most dense.
+
+The second big leap in realism came when the particles ceased to move in dotted lines and began to move in [continuous streaks](https://github.com/Automattic/canvas-fireworks/commit/91a05d63e8bc3d323c678ae5b13870ad7521d172#L0R676). Using the transformation matrix via rotate, translate and scale functions, particles could be stretched from one position to the next as they were projected on the 2D field. This is where Danny Croft's draw3Din2D function became a real treasure: the 2D coordinates were already accessible. All I had to do was save the coordinates for use with the next frame.
+
+With the fireworks looking more realistic than we'd hoped for, I added spotlights to the sky to give it more depth and activity. That was entirely Joen Asmussen's idea. Thanks to "lighter" mode, it took all of fifteen minutes [to add them](https://github.com/Automattic/canvas-fireworks/commit/e0362fdff1d6b62fa2b0f04ef556961a0443103f).
+
+At this point we started looking at the project in other browsers. Performance was abysmal in several modern browsers. We needed to keep track of this in real time and vary the parameters of the animation to make it worthwhile. This would prove to be the most difficult and complex aspect of the project. The most expensive operation in all browsers was inside native code: context.drawImage(). In a nutshell, we accomplished our performance goals by rendering frames in advance and keeping track of the frame cache depth and frame latency. With these parameters we varied the particle count, burnout rate, frame rate, and timeline traversal rate with the goal of keeping several frames in the cache at all times.
+
+The fireworks project we release today is something of an art piece intended to trigger an emotional response to intellectual data. But it is not finished. I hope to see others copy and extend this work.
+
+Andy Skelton (skeltoac)
+12/31/2011
+
+## How to use and customize
+
+TODO (For now, look for the implementation in 2011 annual reports on WordPress.com.)
